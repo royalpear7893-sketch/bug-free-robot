@@ -868,6 +868,7 @@ function MakeToggle(parent, text, default, callback)
     end)
     return Holder
 end
+
 --========================================================
 -- PART 4: PAGE DEFINITIONS & PREMIUM SELECTOR
 --========================================================
@@ -899,22 +900,20 @@ function GetMM2Role(player)
     local hasKnife = false
     local hasGun = false
     
-    -- Check Backpack
     if backpack then
         if backpack:FindFirstChild("Knife") then hasKnife = true end
         if backpack:FindFirstChild("Gun") or backpack:FindFirstChild("Revolver") then hasGun = true end
     end
     
-    -- Check Character (if they are holding it)
     if char:FindFirstChild("Knife") then hasKnife = true end
     if char:FindFirstChild("Gun") or char:FindFirstChild("Revolver") then hasGun = true end
 
     if hasKnife then
-        return "MURDERER", Color3.fromRGB(255, 30, 30) -- Red
+        return "MURDERER", Color3.fromRGB(255, 30, 30)
     elseif hasGun then
-        return "SHERIFF", Color3.fromRGB(50, 150, 255) -- Blue
+        return "SHERIFF", Color3.fromRGB(50, 150, 255)
     else
-        return "INNOCENT", Color3.fromRGB(50, 255, 100) -- Green
+        return "INNOCENT", Color3.fromRGB(50, 255, 100)
     end
 end
 
@@ -963,7 +962,6 @@ function RemoveMM2ESP(player)
     end
 end
 
--- Loop to update colors and text constantly
 RunService = game:GetService("RunService")
 RunService.RenderStepped:Connect(function()
     if not MM2ESPEnabled then return end
@@ -973,14 +971,10 @@ RunService.RenderStepped:Connect(function()
             local data = MM2ESPData[p]
             if data then
                 local roleName, roleColor = GetMM2Role(p)
-                
-                -- Update Highlight
                 if data.Highlight then
                     data.Highlight.FillColor = roleColor
                     data.Highlight.OutlineColor = roleColor
                 end
-                
-                -- Update Billboard Text
                 if data.TextLabel then
                     data.TextLabel.Text = roleName .. "\n" .. p.Name
                     data.TextLabel.TextColor3 = roleColor
@@ -990,7 +984,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ESP Toggle
 MakeToggle(MM2Page, "ROLE ESP (Murderer / Sheriff / Innocent)", false, function(state)
     MM2ESPEnabled = state
     if state then
@@ -1006,7 +999,6 @@ MakeToggle(MM2Page, "ROLE ESP (Murderer / Sheriff / Innocent)", false, function(
     end
 end)
 
--- Handle players joining/leaving while ESP is active
 Players.PlayerAdded:Connect(function(p)
     if MM2ESPEnabled then
         task.wait(1)
@@ -1038,24 +1030,25 @@ for _, p in ipairs(Players:GetPlayers()) do
 end
 
 --========================================================
--- MM2 AUTO-FARM COINS / CANDY (WORKING LOADSTRING)
+-- MM2 HUB LOADER (ELUDE)
 --========================================================
 
-MM2AutoFarmActive = false
+EludeLoaded = false
 
-MakeToggle(MM2Page, "AUTO-FARM COINS / CANDY", false, function(state)
-    MM2AutoFarmActive = state
+MakeToggle(MM2Page, "LOAD ELUDE HUB", false, function(state)
     if state then
-        -- This is a fresh, working open-source farm script for the current MM2 version
-        local success, err = pcall(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/arcprompt/rscripts/refs/heads/main/mm2.lua"))()
-        end)
-        
-        if not success then
-            -- Fallback to another working script if the first one fails
-            pcall(function()
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/f59606268-cell/mm2/main/farm%20coins"))()
+        if not EludeLoaded then
+            EludeLoaded = true
+            local success, err = pcall(function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/mazen798/Elude/refs/heads/main/Elude"))()
             end)
+            
+            if success then
+                ShowNotification("ELUDE", "Hub loaded successfully.", C.Green)
+            else
+                ShowNotification("ELUDE", "Failed to load hub.", C.Red)
+                EludeLoaded = false
+            end
         end
     end
 end)
@@ -3194,6 +3187,7 @@ TPGoBtn.MouseButton1Click:Connect(function()
 end)
 
 print("PERFECT UTILITIES PART 1 READY")
+
 --========================================================
 -- PART 12: UTILITIES (TP TOOL, SPEED, JUMP, AUTO CLICKER)
 --========================================================
@@ -3628,7 +3622,7 @@ task.defer(function()
 end)
 
 --========================================================
--- 5. AUTO CLICKER
+-- 5. AUTO CLICKER (FIXED FOR 3D WORLD)
 --========================================================
 
 AutoClickerCard = Create("Frame", {
@@ -3653,7 +3647,7 @@ Create("TextLabel", {
 }, AutoClickerCard)
 
 AutoClickerActive = false
-AutoClickerSpeed = 10 -- Clicks per second
+AutoClickerSpeed = 10
 
 AutoClickerBtn = Create("TextButton", {
     Size = UDim2.fromOffset(42, 22),
@@ -3675,7 +3669,6 @@ AutoClickerKnob = Create("Frame", {
 }, AutoClickerBtn)
 Round(AutoClickerKnob, 20)
 
--- Speed Display
 ACBadge = Create("Frame", {
     Size = UDim2.fromOffset(56, 20),
     Position = UDim2.new(1, -68, 0, 32),
@@ -3707,7 +3700,6 @@ Create("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Left
 }, AutoClickerCard)
 
--- Slider
 ACTrack = Create("Frame", {
     Size = UDim2.new(1, -24, 0, 10),
     Position = UDim2.new(0, 12, 0, 60),
@@ -3799,23 +3791,34 @@ AutoClickerBtn.MouseButton1Click:Connect(function()
     Animate(AutoClickerKnob, { Position = AutoClickerActive and UDim2.new(1, -19, 0.5, -8) or UDim2.fromOffset(3, 3) })
 end)
 
--- The Clicker Loop
+-- The Clicker Loop (FIXED)
 task.spawn(function()
     while task.wait() do
         if AutoClickerActive then
             local VirtualUser = game:GetService("VirtualUser")
             VirtualUser:CaptureController()
-            VirtualUser:ClickButton1(Vector2.new(0, 0))
             
-            -- Delay based on slider (e.g., 10 clicks/s = 0.1s wait)
+            -- 1. Try UI Click (for buttons)
+            pcall(function() VirtualUser:ClickButton1(Vector2.new(0, 0)) end)
+            
+            -- 2. Try 3D World Click (simulates real mouse hardware)
+            local cam = workspace.CurrentCamera
+            local center = cam.ViewportSize / 2
+            
+            pcall(function()
+                UIS:SendMouseButtonEvent(center.X, center.Y, 0, true, game, 1)
+                UIS:SendMouseButtonEvent(center.X, center.Y, 0, false, game, 1)
+            end)
+            
             task.wait(1 / AutoClickerSpeed)
         else
-            task.wait(0.1) -- Idle wait when off
+            task.wait(0.1)
         end
     end
 end)
 
 print("PERFECT UTILITIES PART 2 READY")
+
 --========================================================
 -- PART 13: UTILITIES (FULLBRIGHT, REJOIN, HOP)
 --========================================================
