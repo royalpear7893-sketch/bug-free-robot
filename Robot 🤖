@@ -2714,6 +2714,7 @@ Player.CharacterAdded:Connect(function()
 end)
 
 print("PERFECT PLAYER ATTACH READY")
+
 --========================================================
 -- PART 10: HITBOX EXPANDER
 --========================================================
@@ -2721,7 +2722,7 @@ print("PERFECT PLAYER ATTACH READY")
 HitboxRoot = Create("Frame", {
     Name = "HitboxRoot",
     Size = UDim2.new(1, 0, 0, 220),
-    Position = UDim2.new(0, 0, 0, 1890), -- FIXED: Moved down from 1870 to 1890 to sit safely below Attach
+    Position = UDim2.new(0, 0, 0, 1890), 
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     LayoutOrder = 4
@@ -2887,7 +2888,7 @@ Round(HitboxSizeKnob, 9)
 Outline(HitboxSizeKnob, C.Cyan, 1.5, 0)
 
 HITBOX_MIN = 5
-HITBOX_MAX = 50
+HITBOX_MAX = 3000
 HitboxSize = 10
 
 function UpdateHitboxSize(value)
@@ -2931,7 +2932,14 @@ UIS.InputChanged:Connect(function(input)
 end)
 task.defer(function()
     task.wait(0.2)
-    HitboxSizeFromPos(HitboxSizeTrack.AbsoluteSize.X * 0.2)
+    local trackWidth = HitboxSizeTrack.AbsoluteSize.X
+    if trackWidth > 0 then
+        local relative = (10 - HITBOX_MIN) / (HITBOX_MAX - HITBOX_MIN)
+        local knobPos = relative * trackWidth
+        HitboxSizeKnob.Position = UDim2.new(0, knobPos - 9, 0.5, -9)
+        HitboxSizeKnobGlow.Position = UDim2.new(0, knobPos - 13, 0.5, -13)
+        HitboxSizeFill.Size = UDim2.new(relative, 0, 1, 0)
+    end
 end)
 
 -- HITBOX LOGIC
@@ -2943,6 +2951,7 @@ function ApplyHitbox(player)
     if hrp then
         hrp.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
         hrp.Transparency = 0.5
+        hrp.CanCollide = false -- Prevents flying if hitbox is huge
     end
 end
 
@@ -2952,6 +2961,7 @@ function RemoveHitbox(player)
     if hrp then
         hrp.Size = Vector3.new(2, 2, 1)
         hrp.Transparency = 1
+        hrp.CanCollide = true
     end
 end
 
@@ -2974,6 +2984,7 @@ HitboxToggleBtn.MouseButton1Click:Connect(function()
     RefreshHitboxes()
 end)
 
+-- Handle Target Respawns (The fix you asked for)
 Players.PlayerAdded:Connect(function(p)
     if HitboxActive then
         task.wait(1)
@@ -2987,11 +2998,32 @@ Players.PlayerAdded:Connect(function(p)
     end)
 end)
 
+-- Handle Already Existing Players Respawns
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= Player then
+        p.CharacterAdded:Connect(function()
+            if HitboxActive then
+                task.wait(0.5)
+                ApplyHitbox(p)
+            end
+        end)
+    end
+end
+
 Players.PlayerRemoving:Connect(function(p)
     RemoveHitbox(p)
 end)
 
+-- Handle YOUR Respawn (If you die and reset, it re-applies to everyone)
+Player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if HitboxActive then
+        RefreshHitboxes()
+    end
+end)
+
 print("PERFECT HITBOX EXPANDER READY")
+
 --========================================================
 -- PART 11: UTILITIES (INFINITE YIELD & TELEPORT)
 --========================================================
