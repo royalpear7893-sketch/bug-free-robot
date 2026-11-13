@@ -6339,43 +6339,6 @@ AntiPage = CreatePage("Anti-Exploiter")
 AddText(AntiPage, "ANTI-EXPLOITER", 32, C.Cyan, Enum.Font.GothamBold)
 AddText(AntiPage, "Protect yourself from hackers and trolls", 22, C.Gray)
 
--- SKY TRAP MECHANIC (Used by Anti-TP and Anti-Attach)
-local SkyTrapClone = nil
-local RealName = ""
-local isTrapDeployed = false
-
-function DeploySkyTrap()
-    if isTrapDeployed then return end
-    local char = Player.Character
-    if not char then return end
-    
-    RealName = char.Name
-    SkyTrapClone = char:Clone()
-    SkyTrapClone.Name = Player.Name -- Hijack the name so scripts target the clone
-    SkyTrapClone.Parent = workspace
-    
-    local root = SkyTrapClone:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = CFrame.new(0, 10000, 0)
-        root.Anchored = true
-    end
-    
-    for _, obj in ipairs(SkyTrapClone:GetDescendants()) do
-        if obj:IsA("Script") or obj:IsA("LocalScript") then obj:Destroy() end
-    end
-    
-    char.Name = "Hidden_" .. Player.Name
-    isTrapDeployed = true
-end
-
-function RemoveSkyTrap()
-    if not isTrapDeployed then return end
-    if SkyTrapClone then SkyTrapClone:Destroy() SkyTrapClone = nil end
-    local char = Player.Character
-    if char then char.Name = RealName end
-    isTrapDeployed = false
-end
-
 --========================================================
 -- SECTION 1: CLIENT SIDE ANTI-EXPLOITER
 --========================================================
@@ -6389,29 +6352,32 @@ Create("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Left
 }, AntiPage)
 
--- 1. ANTI-TP (Sky Trap)
-MakeToggle(AntiPage, "ANTI-TP (Send them to sky)", false, function(state)
-    if state then
-        task.spawn(function()
-            while task.wait(0.1) do
-                local char = Player.Character
-                if char then
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p ~= Player and p.Character then
-                            local myRoot = char:FindFirstChild("HumanoidRootPart")
-                            local theirRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                            if myRoot and theirRoot then
-                                if (myRoot.Position - theirRoot.Position).Magnitude < 3 then
-                                    DeploySkyTrap()
-                                end
-                            end
-                        end
-                    end
+-- 1. ANTI-TP / ANTI-ATTACH / ORBIT (Instant Sky Launch)
+local AntiTrapActive = false
+MakeToggle(AntiPage, "ANTI-TP / ATTACH / ORBIT (Launch to sky)", false, function(state)
+    AntiTrapActive = state
+end)
+
+RunService.Heartbeat:Connect(function()
+    if not AntiTrapActive then return end
+    local char = Player.Character
+    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Player and p.Character then
+            local theirRoot = p.Character:FindFirstChild("HumanoidRootPart")
+            if theirRoot then
+                local dist = (myRoot.Position - theirRoot.Position).Magnitude
+                -- If they get extremely close (TP/Attach/Orbit)
+                if dist < 5 then
+                    -- LAUNCH THEM TO THE SKY
+                    theirRoot.CFrame = CFrame.new(0, 10000, 0)
+                    theirRoot.Velocity = Vector3.new(0, 5000, 0)
+                    ShowNotification("DEFENSE", "Hacker launched to sky!", C.Green)
                 end
             end
-        end)
-    else
-        RemoveSkyTrap()
+        end
     end
 end)
 
@@ -6421,24 +6387,21 @@ MakeToggle(AntiPage, "ANTI-FLING (No noclip break)", false, function(state)
     AntiFlingActive = state
 end)
 
-task.spawn(function()
-    while task.wait(0.1) do
-        if AntiFlingActive then
-            local char = Player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            
-            if hrp and hum then
-                if hum:GetState() == Enum.HumanoidStateType.Physics then
-                    if hrp.Position.Y < 5 then
-                        hrp.CFrame = CFrame.new(hrp.Position.X, 50, hrp.Position.Z)
-                    end
-                end
-                if hrp.Velocity.Magnitude > 300 then
-                    hrp.Velocity = hrp.Velocity.Unit * 50
-                end
-            end
-        end
+RunService.Heartbeat:Connect(function()
+    if not AntiFlingActive then return end
+    local char = Player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- If being flung (velocity is huge)
+    if hrp.Velocity.Magnitude > 150 then
+        -- Reset velocity without freezing Y so you don't fall through the floor
+        hrp.Velocity = Vector3.new(0, hrp.Velocity.Y, 0)
+    end
+    
+    -- If ragdolled and falling below map
+    if hrp.Position.Y < 0 then
+        hrp.CFrame = CFrame.new(hrp.Position.X, 10, hrp.Position.Z)
     end
 end)
 
@@ -6448,39 +6411,11 @@ MakeToggle(AntiPage, "ANTI-VOID", false, function(state)
     AntiVoidActive = state
 end)
 
-task.spawn(function()
-    while task.wait(0.2) do
-        if AntiVoidActive then
-            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and hrp.Position.Y < -50 then
-                hrp.CFrame = CFrame.new(0, 50, 0)
-                ShowNotification("DEFENSE", "Saved from void", C.Green)
-            end
-        end
-    end
-end)
-
--- 4. ANTI-ATTACH / ORBIT (Sky Trap)
-MakeToggle(AntiPage, "ANTI-ATTACH / ORBIT", false, function(state)
-    if state then
-        task.spawn(function()
-            while task.wait(0.1) do
-                local char = Player.Character
-                local myRoot = char and char:FindFirstChild("HumanoidRootPart")
-                if myRoot then
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p ~= Player and p.Character then
-                            local theirRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                            if theirRoot and (myRoot.Position - theirRoot.Position).Magnitude < 6 then
-                                DeploySkyTrap()
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-    else
-        RemoveSkyTrap()
+RunService.Heartbeat:Connect(function()
+    if not AntiVoidActive then return end
+    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if hrp and hrp.Position.Y < -50 then
+        hrp.CFrame = CFrame.new(0, 50, 0)
     end
 end)
 
@@ -6503,6 +6438,7 @@ Create("TextLabel", {
 -- 1. SERVER ANTI-TP (Snapback)
 ServerAntiTPActive = false
 local ServerSafePos = nil
+
 MakeToggle(AntiPage, "ANTI-TP (Snapback if TP'd)", false, function(state)
     ServerAntiTPActive = state
     if state and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
@@ -6510,24 +6446,23 @@ MakeToggle(AntiPage, "ANTI-TP (Snapback if TP'd)", false, function(state)
     end
 end)
 
-task.spawn(function()
-    while task.wait(0.1) do
-        if ServerAntiTPActive then
-            local char = Player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                if ServerSafePos then
-                    if (hrp.Position - ServerSafePos.Position).Magnitude > 50 then
-                        hrp.CFrame = ServerSafePos
-                        hrp.Velocity = Vector3.zero
-                        ShowNotification("SERVER DEFENSE", "Snapped back from TP", C.Cyan)
-                    else
-                        ServerSafePos = hrp.CFrame
-                    end
-                else
-                    ServerSafePos = hrp.CFrame
-                end
+RunService.Heartbeat:Connect(function()
+    if not ServerAntiTPActive then return end
+    local char = Player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        if ServerSafePos then
+            -- If we moved more than 15 studs in a single frame (Teleport)
+            if (hrp.Position - ServerSafePos.Position).Magnitude > 15 then
+                hrp.CFrame = ServerSafePos
+                hrp.Velocity = Vector3.zero
+                ShowNotification("SERVER DEFENSE", "Snapped back!", C.Cyan)
+            else
+                -- Only update safe pos if we are moving normally
+                ServerSafePos = hrp.CFrame
             end
+        else
+            ServerSafePos = hrp.CFrame
         end
     end
 end)
@@ -6539,7 +6474,7 @@ MakeToggle(AntiPage, "ANTI-FREEZE (Unanchor)", false, function(state)
 end)
 
 task.spawn(function()
-    while task.wait(0.2) do
+    while task.wait(0.1) do
         if AntiFreezeActive then
             local char = Player.Character
             if char then
@@ -6574,10 +6509,9 @@ MakeToggle(AntiPage, "SERVER BOMB (Lag Bomb)", false, function(state)
     end
 end)
 
--- Handle Respawns for all toggles
+-- Handle Respawns
 Player.CharacterAdded:Connect(function()
     task.wait(1.5)
-    isTrapDeployed = false
     if ServerAntiTPActive and Player.Character then
         local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
         if hrp then ServerSafePos = hrp.CFrame end
