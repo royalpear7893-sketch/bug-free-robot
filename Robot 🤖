@@ -6521,7 +6521,7 @@ end)
 print("PERFECT ANTI-EXPLOITER READY")
 
 --========================================================
--- PART 21: AI CHAT (POLISHED UI, SMART SCANNER, NO LAG)
+-- PART 21: AI CHAT (UI, SMART SCANNER, TRANSLATOR, COMMANDS)
 --========================================================
 
 AIPage = CreatePage("AI Chat")
@@ -6608,7 +6608,7 @@ local otherPlayersChats = {}
 local API_KEY = "sk_6rPAJbZoeRcyxPRKGYr7GzvoUOKlC5Y2"
 local API_URL = "https://gen.pollinations.ai/v1/chat/completions"
 
--- Listen to other players chatting for translation memory
+-- Listen to other players chatting
 TextChatService.MessageReceived:Connect(function(message)
     local sender = message.TextSource and Players:GetPlayerByUserId(message.TextSource.UserId)
     if sender and sender ~= Players.LocalPlayer then
@@ -6689,6 +6689,92 @@ end
 function ProcessAIRequest(prompt, sendToChat)
     if prompt == "" then return end
     
+    local lowerPrompt = string.lower(prompt)
+    local playerToScan = nil
+    
+    -- 1. Fuzzy Player Detection (Scans by partial name or display name)
+    for word in string.gmatch(lowerPrompt, "%a+") do
+        -- Ignore common words so it doesn't accidentally match them to players
+        if word ~= "kogane" and word ~= "what" and word ~= "is" and word ~= "the" and word ~= "aim" and word ~= "at" and word ~= "translate" and word ~= "saying" and word ~= "wearing" and word ~= "cost" and word ~= "turn" and word ~= "on" and word ~= "off" and word ~= "esp" and word ~= "hitbox" and word ~= "speed" and word ~= "my" and word ~= "me" then
+            
+            for _, p in ipairs(Players:GetPlayers()) do
+                local nameLower = string.lower(p.Name)
+                local displayNameLower = string.lower(p.DisplayName)
+                
+                -- If the word is inside their username or display name
+                if string.find(nameLower, word, 1, true) or string.find(displayNameLower, word, 1, true) then
+                    playerToScan = p
+                    break
+                end
+            end
+            
+            if playerToScan then break end -- Stop searching if we found someone
+        end
+    end
+            
+    -- If no specific name was found, but you said "my" or "me", scan YOUR avatar
+    if not playerToScan and (string.find(lowerPrompt, " my ") or string.find(lowerPrompt, " me ") or lowerPrompt == "what does my avatar cost") then
+        playerToScan = Player
+    end
+
+    -- ==========================================
+    -- GUI COMMAND CONTROLLER
+    -- ==========================================
+    if string.find(lowerPrompt, "aim at") or string.find(lowerPrompt, "aimbot on") then
+        if playerToScan then
+            AimModeCamera = true
+            AimManualTarget = playerToScan
+            AimTargetMode = "MANUAL"
+            AimActive = true
+            if StartBtn then 
+                StartBtn.Text = "STOP AIMBOT" 
+                StartBtn.BackgroundColor3 = C.Red
+            end
+            AddMessageToUI("✅ Aimbot locked onto " .. playerToScan.Name, true)
+            return
+        end
+    elseif string.find(lowerPrompt, "turn on esp") or string.find(lowerPrompt, "enable esp") then
+        ESPActive = true
+        if RefreshAllESP then RefreshAllESP() end
+        if ESPToggleBtn then 
+            ESPToggleBtn.BackgroundColor3 = C.Blue
+            ESPToggleKnob.Position = UDim2.new(1, -19, 0.5, -8)
+        end
+        AddMessageToUI("✅ Player ESP Enabled", true)
+        return
+    elseif string.find(lowerPrompt, "turn off esp") or string.find(lowerPrompt, "disable esp") then
+        ESPActive = false
+        if RemoveAllESP then RemoveAllESP() end
+        if ESPToggleBtn then 
+            ESPToggleBtn.BackgroundColor3 = C.Background
+            ESPToggleKnob.Position = UDim2.fromOffset(3, 3)
+        end
+        AddMessageToUI("❌ Player ESP Disabled", true)
+        return
+    elseif string.find(lowerPrompt, "hitbox") and string.find(lowerPrompt, "on") then
+        HitboxActive = true
+        if RefreshHitboxes then RefreshHitboxes() end
+        if HitboxToggleBtn then 
+            HitboxToggleBtn.BackgroundColor3 = C.Blue
+            HitboxToggleKnob.Position = UDim2.new(1, -19, 0.5, -8)
+        end
+        AddMessageToUI("✅ Hitbox Expander Enabled", true)
+        return
+    elseif string.find(lowerPrompt, "speed") then
+        local newSpeed = tonumber(string.match(lowerPrompt, "%d+"))
+        if newSpeed then
+            SpeedCurrent = newSpeed
+            local char = Player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = newSpeed end
+            AddMessageToUI("✅ Speed set to " .. newSpeed, true)
+            return
+        end
+    end
+
+    -- ==========================================
+    -- IF NO COMMAND WAS MATCHED, GO TO AI
+    -- ==========================================
     AddMessageToUI(prompt, true)
     table.insert(chatHistory, {role = "user", content = prompt})
     
@@ -6698,30 +6784,11 @@ function ProcessAIRequest(prompt, sendToChat)
     
     local thinkingFrame = AddMessageToUI("Scanning...", false)
     
-    -- Run in task.spawn so the game doesn't freeze waiting for web requests
     task.spawn(function()
         local success, response = pcall(function()
-            local avatarDataString = ""
-            local lowerPrompt = string.lower(prompt)
-            local playerToScan = nil
+            local avatarDataString = "User did not specify a player to scan. "
             
-            -- 1. Smart Player Detection (Checks Username AND Display Name)
-            for _, p in ipairs(Players:GetPlayers()) do
-                local nameLower = string.lower(p.Name)
-                local displayNameLower = string.lower(p.DisplayName)
-                
-                if string.find(lowerPrompt, nameLower, 1, true) or string.find(lowerPrompt, displayNameLower, 1, true) then
-                    playerToScan = p
-                    break
-                end
-            end
-            
-            -- If no specific name found, but you said "my" or "me", scan YOUR avatar
-            if not playerToScan and (string.find(lowerPrompt, " my ") or string.find(lowerPrompt, " me ") or lowerPrompt == "what does my avatar cost") then
-                playerToScan = Player
-            end
-
-            -- 2. Only scan ONE player to prevent lag
+            -- Avatar Scanner
             if playerToScan then
                 local wearingUrl = "https://avatar.roblox.com/v1/users/" .. playerToScan.UserId .. "/currently-wearing"
                 local wearSuccess, wearRes = pcall(function() 
@@ -6763,21 +6830,25 @@ function ProcessAIRequest(prompt, sendToChat)
                         end
                     end
                 end
-            else
-                avatarDataString = "User did not specify a player to scan. "
             end
             
-            -- 3. Gather Chat Context
+            -- Chat Translator Context
             local chatContext = ""
             if #otherPlayersChats > 0 then
                 chatContext = " Recent chat from other players: " .. table.concat(otherPlayersChats, " | ")
+            else
+                chatContext = " (No recent chat detected. Roblox may be blocking it, or nobody has spoken yet.) "
             end
             
-            -- 4. Create System Prompt
             local systemPrompt = "You are a helpful AI in a Roblox game. "
             systemPrompt = systemPrompt .. "Avatar Data: " .. avatarDataString .. " "
             systemPrompt = systemPrompt .. chatContext .. " "
-            systemPrompt = systemPrompt .. "Answer the user using this data. If they ask to translate, use the chat context."
+            
+            if string.find(lowerPrompt, "translate") or string.find(lowerPrompt, "say") then
+                systemPrompt = systemPrompt .. "The user is asking for a translation. YOU MUST look inside the 'Recent chat' data and translate what the requested player said."
+            else
+                systemPrompt = systemPrompt .. "Answer the user using this data."
+            end
             
             local tempHistory = {{role = "system", content = systemPrompt}}
             for _, msg in ipairs(chatHistory) do
