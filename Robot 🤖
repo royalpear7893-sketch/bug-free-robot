@@ -6521,7 +6521,7 @@ end)
 print("PERFECT ANTI-EXPLOITER READY")
 
 --========================================================
--- PART 21: AI CHAT (POLISHED UI, AVATAR SCANNER, CHAT TRANSLATOR)
+-- PART 21: AI CHAT (POLISHED UI, SMART SCANNER, NO LAG)
 --========================================================
 
 AIPage = CreatePage("AI Chat")
@@ -6696,114 +6696,140 @@ function ProcessAIRequest(prompt, sendToChat)
         table.remove(chatHistory, 1)
     end
     
-    local thinkingFrame = AddMessageToUI("Scanning server...", false)
+    local thinkingFrame = AddMessageToUI("Scanning...", false)
     
-    local success, response = pcall(function()
-        -- 1. GATHER AVATAR DATA & PLAYER NAMES
-        local avatarDataString = ""
-        for _, p in ipairs(Players:GetPlayers()) do
-            local wearingUrl = "https://avatar.roblox.com/v1/users/" .. p.UserId .. "/currently-wearing"
-            local wearSuccess, wearRes = pcall(function() 
-                return request({Url = wearingUrl, Method = "GET"}).Body 
-            end)
+    -- Run in task.spawn so the game doesn't freeze waiting for web requests
+    task.spawn(function()
+        local success, response = pcall(function()
+            local avatarDataString = ""
+            local lowerPrompt = string.lower(prompt)
+            local playerToScan = nil
             
-            if wearSuccess and wearRes then
-                local ok, wearData = pcall(function() return HttpService:JSONDecode(wearRes) end)
-                if ok and wearData and wearData.assets then
-                    local assetIds = {}
-                    local assetNames = {}
-                    
-                    for _, asset in ipairs(wearData.assets) do
-                        table.insert(assetIds, tostring(asset.id))
-                    end
-                    
-                    if #assetIds > 0 then
-                        local priceUrl = "https://catalog.roblox.com/v1/catalog/items/details?ids=" .. table.concat(assetIds, ",")
-                        local priceSuccess, priceRes = pcall(function()
-                            return request({Url = priceUrl, Method = "GET"}).Body
-                        end)
+            -- 1. Smart Player Detection (Checks Username AND Display Name)
+            for _, p in ipairs(Players:GetPlayers()) do
+                local nameLower = string.lower(p.Name)
+                local displayNameLower = string.lower(p.DisplayName)
+                
+                if string.find(lowerPrompt, nameLower, 1, true) or string.find(lowerPrompt, displayNameLower, 1, true) then
+                    playerToScan = p
+                    break
+                end
+            end
+            
+            -- If no specific name found, but you said "my" or "me", scan YOUR avatar
+            if not playerToScan and (string.find(lowerPrompt, " my ") or string.find(lowerPrompt, " me ") or lowerPrompt == "what does my avatar cost") then
+                playerToScan = Player
+            end
+
+            -- 2. Only scan ONE player to prevent lag
+            if playerToScan then
+                local wearingUrl = "https://avatar.roblox.com/v1/users/" .. playerToScan.UserId .. "/currently-wearing"
+                local wearSuccess, wearRes = pcall(function() 
+                    return request({Url = wearingUrl, Method = "GET"}).Body 
+                end)
+                
+                if wearSuccess and wearRes then
+                    local ok, wearData = pcall(function() return HttpService:JSONDecode(wearRes) end)
+                    if ok and wearData and wearData.assets then
+                        local assetIds = {}
+                        local assetNames = {}
                         
-                        if priceSuccess and priceRes then
-                            local pOk, priceData = pcall(function() return HttpService:JSONDecode(priceRes) end)
-                            if pOk and priceData and priceData.data then
-                                for _, item in ipairs(priceData.data) do
-                                    local price = item.price or "Off-Sale"
-                                    local name = item.name or "Unknown"
-                                    table.insert(assetNames, name .. " (" .. tostring(price) .. " R$)")
+                        for _, asset in ipairs(wearData.assets) do
+                            table.insert(assetIds, tostring(asset.id))
+                        end
+                        
+                        if #assetIds > 0 then
+                            local priceUrl = "https://catalog.roblox.com/v1/catalog/items/details?ids=" .. table.concat(assetIds, ",")
+                            local priceSuccess, priceRes = pcall(function()
+                                return request({Url = priceUrl, Method = "GET"}).Body
+                            end)
+                            
+                            if priceSuccess and priceRes then
+                                local pOk, priceData = pcall(function() return HttpService:JSONDecode(priceRes) end)
+                                if pOk and priceData and priceData.data then
+                                    for _, item in ipairs(priceData.data) do
+                                        local price = item.price or "Off-Sale"
+                                        local name = item.name or "Unknown Item"
+                                        table.insert(assetNames, name .. " (" .. tostring(price) .. " R$)")
+                                    end
                                 end
                             end
                         end
-                    end
-                    
-                    if #assetNames > 0 then
-                        avatarDataString = avatarDataString .. p.Name .. " is wearing: " .. table.concat(assetNames, ", ") .. ". "
+                        
+                        if #assetNames > 0 then
+                            avatarDataString = playerToScan.Name .. " is wearing: " .. table.concat(assetNames, ", ") .. ". "
+                        else
+                            avatarDataString = playerToScan.Name .. " is not wearing any purchasable items. "
+                        end
                     end
                 end
+            else
+                avatarDataString = "User did not specify a player to scan. "
             end
-        end
-        
-        -- 2. GATHER CHAT DATA
-        local chatContext = ""
-        if #otherPlayersChats > 0 then
-            chatContext = " Recent chat from other players: " .. table.concat(otherPlayersChats, " | ")
-        end
-        
-        -- 3. CREATE SYSTEM PROMPT
-        local systemPrompt = "You are a helpful AI in a Roblox game. "
-        systemPrompt = systemPrompt .. "Server Data: " .. avatarDataString .. " "
-        systemPrompt = systemPrompt .. chatContext .. " "
-        systemPrompt = systemPrompt .. "If the user asks you to translate what a specific player said, find their message in the 'Recent chat' data and translate it. Keep answers brief."
-        
-        local tempHistory = {{role = "system", content = systemPrompt}}
-        for _, msg in ipairs(chatHistory) do
-            table.insert(tempHistory, msg)
-        end
-        
-        local payload = HttpService:JSONEncode({
-            messages = tempHistory,
-            model = "openai"
-        })
-        
-        local reqFunc = syn and syn.request or request
-        if not reqFunc then error("Executor lacks HTTP request function") end
-        
-        local res = reqFunc({
-            Url = API_URL,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["Authorization"] = "Bearer " .. API_KEY
-            },
-            Body = payload
-        })
-        
-        if not res.Success then
-            error("HTTP " .. res.StatusCode .. ": " .. tostring(res.Body):sub(1, 150))
-        end
-        return res.Body
-    end)
-    
-    if thinkingFrame then thinkingFrame:Destroy() end
-    
-    if success then
-        local ok, decoded = pcall(function() return HttpService:JSONDecode(response) end)
-        if ok and decoded and decoded.choices and decoded.choices[1] then
-            local reply = decoded.choices[1].message.content
-            table.insert(chatHistory, {role = "assistant", content = reply})
-            AddMessageToUI(reply, false)
             
-            if sendToChat then
-                local targetChannel = TextChatService.ChatInputBarConfiguration.TargetTextChannel
-                if targetChannel then
-                    pcall(function() targetChannel:SendAsync(reply) end)
+            -- 3. Gather Chat Context
+            local chatContext = ""
+            if #otherPlayersChats > 0 then
+                chatContext = " Recent chat from other players: " .. table.concat(otherPlayersChats, " | ")
+            end
+            
+            -- 4. Create System Prompt
+            local systemPrompt = "You are a helpful AI in a Roblox game. "
+            systemPrompt = systemPrompt .. "Avatar Data: " .. avatarDataString .. " "
+            systemPrompt = systemPrompt .. chatContext .. " "
+            systemPrompt = systemPrompt .. "Answer the user using this data. If they ask to translate, use the chat context."
+            
+            local tempHistory = {{role = "system", content = systemPrompt}}
+            for _, msg in ipairs(chatHistory) do
+                table.insert(tempHistory, msg)
+            end
+            
+            local payload = HttpService:JSONEncode({
+                messages = tempHistory,
+                model = "openai"
+            })
+            
+            local reqFunc = syn and syn.request or request
+            if not reqFunc then error("Executor lacks HTTP request function") end
+            
+            local res = reqFunc({
+                Url = API_URL,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json",
+                    ["Authorization"] = "Bearer " .. API_KEY
+                },
+                Body = payload
+            })
+            
+            if not res.Success then
+                error("HTTP " .. res.StatusCode .. ": " .. tostring(res.Body):sub(1, 150))
+            end
+            return res.Body
+        end)
+        
+        if thinkingFrame then thinkingFrame:Destroy() end
+        
+        if success then
+            local ok, decoded = pcall(function() return HttpService:JSONDecode(response) end)
+            if ok and decoded and decoded.choices and decoded.choices[1] then
+                local reply = decoded.choices[1].message.content
+                table.insert(chatHistory, {role = "assistant", content = reply})
+                AddMessageToUI(reply, false)
+                
+                if sendToChat then
+                    local targetChannel = TextChatService.ChatInputBarConfiguration.TargetTextChannel
+                    if targetChannel then
+                        pcall(function() targetChannel:SendAsync(reply) end)
+                    end
                 end
+            else
+                AddMessageToUI("Error: Bad response format.", false)
             end
         else
-            AddMessageToUI("Error: Bad response format.", false)
+            AddMessageToUI("Error: " .. tostring(response):sub(1, 100), false)
         end
-    else
-        AddMessageToUI("Error: " .. tostring(response):sub(1, 100), false)
-    end
+    end)
 end
 
 AIInput.FocusLost:Connect(function(enterPressed)
