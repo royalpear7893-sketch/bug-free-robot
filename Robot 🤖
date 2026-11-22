@@ -6706,12 +6706,11 @@ function ProcessAIRequest(prompt, sendToChat)
         end
     end
             
-    -- If no specific name was found, but you said "my" or "me", scan YOUR avatar
     if not playerToScan and (string.find(lowerPrompt, " my ") or string.find(lowerPrompt, " me ") or lowerPrompt == "what does my avatar cost") then
         playerToScan = Player
     end
 
-    -- FIX: If teleporting, ignore "me" and look for the actual target
+    -- Fix for Teleport "me" bug
     if playerToScan == Player and (string.find(lowerPrompt, "teleport") or string.find(lowerPrompt, "tp")) and string.find(lowerPrompt, " to ") then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= Player then
@@ -6723,8 +6722,8 @@ function ProcessAIRequest(prompt, sendToChat)
                 end
             end
         end
-    end
-    -- ==========================================
+    end 
+-- ==========================================
     -- SMART GUI COMMAND CONTROLLER
     -- ==========================================
     
@@ -6735,17 +6734,6 @@ function ProcessAIRequest(prompt, sendToChat)
             local targetChannel = TextChatService.ChatInputBarConfiguration.TargetTextChannel
             if targetChannel then pcall(function() targetChannel:SendAsync("COMMAND LIST: aim, esp, hitbox, speed, jump, tp, attach, fullbright, reset, hop, rejoin, off all.") end) end
         end
-        return
-    end
-
-    -- Server Hop & Rejoin
-    if string.find(lowerPrompt, "hop") or string.find(lowerPrompt, "new server") then
-        AddMessageToUI("🌐 Hopping servers...", true)
-        if HopBtn then HopBtn:Fire("MouseButton1Click") end
-        return
-    elseif string.find(lowerPrompt, "rejoin") then
-        AddMessageToUI("🔄 Rejoining server...", true)
-        if RejoinBtn then RejoinBtn:Fire("MouseButton1Click") end
         return
     end
 
@@ -6760,8 +6748,18 @@ function ProcessAIRequest(prompt, sendToChat)
         if RefreshHitboxes then RefreshHitboxes() end
         if HitboxToggleBtn then HitboxToggleBtn.BackgroundColor3 = C.Background; HitboxToggleKnob.Position = UDim2.fromOffset(3, 3) end
         AttachActive = false
+        if DestroyAttachConstraints then DestroyAttachConstraints() end
+        if SetNoclip then SetNoclip(false) end
         if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Background; AttachToggleKnob.Position = UDim2.fromOffset(3, 3) end
-        if FullbrightActive then if FullbrightBtn then FullbrightBtn:Fire("MouseButton1Click") end end
+        if FullbrightActive then 
+            FullbrightActive = false
+            Lighting.Brightness = originalBrightness
+            Lighting.OutdoorAmbient = originalOutdoor
+            Lighting.Ambient = originalAmbient
+            Lighting.GlobalShadows = originalShadows
+            Lighting.FogEnd = originalFog
+            if FullbrightBtn then FullbrightBtn.BackgroundColor3 = C.Background; FullbrightKnob.Position = UDim2.fromOffset(3, 3) end
+        end
         AddMessageToUI("🛑 ALL FEATURES DISABLED", true)
         return
     end
@@ -6784,16 +6782,66 @@ function ProcessAIRequest(prompt, sendToChat)
             AddMessageToUI("❌ Hitbox Disabled", true); return
         elseif string.find(lowerPrompt, "attach") or string.find(lowerPrompt, "follow") then
             AttachActive = false
+            if DestroyAttachConstraints then DestroyAttachConstraints() end
+            if SetNoclip then SetNoclip(false) end
             if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Background; AttachToggleKnob.Position = UDim2.fromOffset(3, 3) end
             AddMessageToUI("❌ Attach Disabled", true); return
         elseif string.find(lowerPrompt, "fullbright") or string.find(lowerPrompt, "light") then
-            if FullbrightActive then if FullbrightBtn then FullbrightBtn:Fire("MouseButton1Click") end; AddMessageToUI("❌ Fullbright Disabled", true) end
+            if FullbrightActive then
+                FullbrightActive = false
+                Lighting.Brightness = originalBrightness
+                Lighting.OutdoorAmbient = originalOutdoor
+                Lighting.Ambient = originalAmbient
+                Lighting.GlobalShadows = originalShadows
+                Lighting.FogEnd = originalFog
+                if FullbrightBtn then FullbrightBtn.BackgroundColor3 = C.Background; FullbrightKnob.Position = UDim2.fromOffset(3, 3) end
+                AddMessageToUI("❌ Fullbright Disabled", true) 
+            end
             return
         end
     end
 
     -- Actions
-    if string.find(lowerPrompt, "aim") then
+    if string.find(lowerPrompt, "hop") or string.find(lowerPrompt, "new server") then
+        AddMessageToUI("🌐 Hopping servers...", true)
+        pcall(function()
+            local raw = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+            local data = game:GetService("HttpService"):JSONDecode(raw)
+            local candidates = {}
+            for _, srv in ipairs(data.data) do
+                if srv.id ~= game.JobId and srv.playing < srv.maxPlayers then table.insert(candidates, srv.id) end
+            end
+            if #candidates > 0 then
+                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, candidates[math.random(1, #candidates)], Player)
+            else
+                AddMessageToUI("❌ No servers found.", false)
+            end
+        end)
+        return
+    elseif string.find(lowerPrompt, "rejoin") then
+        AddMessageToUI("🔄 Rejoining server...", true)
+        pcall(function() game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, Player) end)
+        return
+    elseif string.find(lowerPrompt, "reset") or string.find(lowerPrompt, "die") or string.find(lowerPrompt, "kill me") then
+        local char = Player.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Health = 0 else char:BreakJoints() end
+        end
+        AddMessageToUI("✅ Resetting character", true); return
+    elseif string.find(lowerPrompt, "fullbright") or string.find(lowerPrompt, "light") then
+        if not FullbrightActive then
+            FullbrightActive = true
+            Lighting.Brightness = 5
+            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 100000
+            if FullbrightBtn then FullbrightBtn.BackgroundColor3 = C.Blue; FullbrightKnob.Position = UDim2.new(1, -19, 0.5, -8) end
+            AddMessageToUI("✅ Fullbright Enabled", true)
+        end
+        return
+    elseif string.find(lowerPrompt, "aim") then
         if playerToScan then
             AimModeCamera = true; AimManualTarget = playerToScan; AimTargetMode = "MANUAL"; AimActive = true
             if StartBtn then StartBtn.Text = "STOP AIMBOT"; StartBtn.BackgroundColor3 = C.Red end
@@ -6842,15 +6890,11 @@ function ProcessAIRequest(prompt, sendToChat)
     elseif string.find(lowerPrompt, "attach") or string.find(lowerPrompt, "follow") then
         if playerToScan then
             AttachTarget = playerToScan; AttachActive = true
+            if RebuildAttachConstraints then RebuildAttachConstraints() end
+            if SetNoclip then SetNoclip(true) end
             if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Blue; AttachToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
             AddMessageToUI("✅ Attached to " .. playerToScan.Name, true); return
         end
-    elseif string.find(lowerPrompt, "fullbright") or string.find(lowerPrompt, "light") then
-        if not FullbrightActive then if FullbrightBtn then FullbrightBtn:Fire("MouseButton1Click") end; AddMessageToUI("✅ Fullbright Enabled", true) end
-        return
-    elseif string.find(lowerPrompt, "reset") or string.find(lowerPrompt, "die") or string.find(lowerPrompt, "kill me") then
-        if ResetButton then ResetButton:Fire("MouseButton1Click") end
-        AddMessageToUI("✅ Resetting character", true); return
     end
 
     -- ==========================================
@@ -6959,7 +7003,37 @@ function ProcessAIRequest(prompt, sendToChat)
                 
                 if sendToChat then
                     local targetChannel = TextChatService.ChatInputBarConfiguration.TargetTextChannel
-                    if targetChannel then pcall(function() targetChannel:SendAsync(reply) end) end
+                    if targetChannel then
+                        -- 200 Character Splitter Logic
+                        local function splitText(text, maxLen)
+                            local chunks = {}
+                            while #text > 0 do
+                                if #text <= maxLen then
+                                    table.insert(chunks, text)
+                                    break
+                                end
+                                local splitPoint = maxLen
+                                for i = maxLen, 1, -1 do
+                                    if string.sub(text, i, i) == " " then
+                                        splitPoint = i
+                                        break
+                                    end
+                                end
+                                table.insert(chunks, string.sub(text, 1, splitPoint))
+                                text = string.sub(text, splitPoint + 1)
+                            end
+                            return chunks
+                        end
+                        
+                        local chunks = splitText(reply, 190)
+                        
+                        task.spawn(function()
+                            for i, chunk in ipairs(chunks) do
+                                pcall(function() targetChannel:SendAsync(chunk) end)
+                                if i < #chunks then task.wait(2) end
+                            end
+                        end)
+                    end
                 end
             else
                 AddMessageToUI("Error: Bad response format.", false)
