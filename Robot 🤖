@@ -6521,7 +6521,7 @@ end)
 print("PERFECT ANTI-EXPLOITER READY")
 
 --========================================================
--- PART 21: AI CHAT (POLISHED UI + CHAT TRIGGER)
+-- PART 21: AI CHAT (POLISHED UI, AVATAR SCANNER, CHAT TRANSLATOR)
 --========================================================
 
 AIPage = CreatePage("AI Chat")
@@ -6599,10 +6599,25 @@ Outline(AISendBtn, C.Cyan, 1, 0.3)
 MakeGradient(AISendBtn, C.Blue2, C.Violet, 0)
 
 local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local TextChatService = game:GetService("TextChatService")
+
 local chatHistory = {}
+local otherPlayersChats = {}
 
 local API_KEY = "sk_6rPAJbZoeRcyxPRKGYr7GzvoUOKlC5Y2"
 local API_URL = "https://gen.pollinations.ai/v1/chat/completions"
+
+-- Listen to other players chatting for translation memory
+TextChatService.MessageReceived:Connect(function(message)
+    local sender = message.TextSource and Players:GetPlayerByUserId(message.TextSource.UserId)
+    if sender and sender ~= Players.LocalPlayer then
+        table.insert(otherPlayersChats, sender.Name .. " said: " .. message.Text)
+        if #otherPlayersChats > 10 then
+            table.remove(otherPlayersChats, 1)
+        end
+    end
+end)
 
 function AddMessageToUI(text, isUser)
     local container = Create("Frame", {
@@ -6681,11 +6696,71 @@ function ProcessAIRequest(prompt, sendToChat)
         table.remove(chatHistory, 1)
     end
     
-    local thinkingFrame = AddMessageToUI("Thinking...", false)
+    local thinkingFrame = AddMessageToUI("Scanning server...", false)
     
     local success, response = pcall(function()
+        -- 1. GATHER AVATAR DATA & PLAYER NAMES
+        local avatarDataString = ""
+        for _, p in ipairs(Players:GetPlayers()) do
+            local wearingUrl = "https://avatar.roblox.com/v1/users/" .. p.UserId .. "/currently-wearing"
+            local wearSuccess, wearRes = pcall(function() 
+                return request({Url = wearingUrl, Method = "GET"}).Body 
+            end)
+            
+            if wearSuccess and wearRes then
+                local ok, wearData = pcall(function() return HttpService:JSONDecode(wearRes) end)
+                if ok and wearData and wearData.assets then
+                    local assetIds = {}
+                    local assetNames = {}
+                    
+                    for _, asset in ipairs(wearData.assets) do
+                        table.insert(assetIds, tostring(asset.id))
+                    end
+                    
+                    if #assetIds > 0 then
+                        local priceUrl = "https://catalog.roblox.com/v1/catalog/items/details?ids=" .. table.concat(assetIds, ",")
+                        local priceSuccess, priceRes = pcall(function()
+                            return request({Url = priceUrl, Method = "GET"}).Body
+                        end)
+                        
+                        if priceSuccess and priceRes then
+                            local pOk, priceData = pcall(function() return HttpService:JSONDecode(priceRes) end)
+                            if pOk and priceData and priceData.data then
+                                for _, item in ipairs(priceData.data) do
+                                    local price = item.price or "Off-Sale"
+                                    local name = item.name or "Unknown"
+                                    table.insert(assetNames, name .. " (" .. tostring(price) .. " R$)")
+                                end
+                            end
+                        end
+                    end
+                    
+                    if #assetNames > 0 then
+                        avatarDataString = avatarDataString .. p.Name .. " is wearing: " .. table.concat(assetNames, ", ") .. ". "
+                    end
+                end
+            end
+        end
+        
+        -- 2. GATHER CHAT DATA
+        local chatContext = ""
+        if #otherPlayersChats > 0 then
+            chatContext = " Recent chat from other players: " .. table.concat(otherPlayersChats, " | ")
+        end
+        
+        -- 3. CREATE SYSTEM PROMPT
+        local systemPrompt = "You are a helpful AI in a Roblox game. "
+        systemPrompt = systemPrompt .. "Server Data: " .. avatarDataString .. " "
+        systemPrompt = systemPrompt .. chatContext .. " "
+        systemPrompt = systemPrompt .. "If the user asks you to translate what a specific player said, find their message in the 'Recent chat' data and translate it. Keep answers brief."
+        
+        local tempHistory = {{role = "system", content = systemPrompt}}
+        for _, msg in ipairs(chatHistory) do
+            table.insert(tempHistory, msg)
+        end
+        
         local payload = HttpService:JSONEncode({
-            messages = chatHistory,
+            messages = tempHistory,
             model = "openai"
         })
         
@@ -6717,15 +6792,12 @@ function ProcessAIRequest(prompt, sendToChat)
             table.insert(chatHistory, {role = "assistant", content = reply})
             AddMessageToUI(reply, false)
             
-            -- Send to Roblox Chat if triggered from there
             if sendToChat then
-                local TextChatService = game:GetService("TextChatService")
                 local targetChannel = TextChatService.ChatInputBarConfiguration.TargetTextChannel
                 if targetChannel then
                     pcall(function() targetChannel:SendAsync(reply) end)
                 end
             end
-            
         else
             AddMessageToUI("Error: Bad response format.", false)
         end
@@ -6744,14 +6816,12 @@ AISendBtn.MouseButton1Click:Connect(function()
     local prompt = AIInput.Text
     if prompt == "" then return end
     AIInput.Text = ""
-    ProcessAIRequest(prompt, false) -- Send to UI only
+    ProcessAIRequest(prompt, false)
 end)
 
 --========================================================
 -- CHAT TRIGGER ("kogane [message]")
 --========================================================
-
-local TextChatService = game:GetService("TextChatService")
 
 TextChatService.MessageReceived:Connect(function(message)
     if not message.TextSource or message.TextSource.UserId ~= Player.UserId then return end
@@ -6760,7 +6830,7 @@ TextChatService.MessageReceived:Connect(function(message)
     if string.lower(string.sub(text, 1, 7)) == "kogane " then
         local prompt = string.sub(text, 8)
         if prompt ~= "" then
-            ProcessAIRequest(prompt, true) -- Send to UI AND public chat
+            ProcessAIRequest(prompt, true)
         end
     end
 end)
