@@ -6521,7 +6521,7 @@ end)
 print("PERFECT ANTI-EXPLOITER READY")
 
 --========================================================
--- PART 21: AI CHAT (FIXED)
+-- PART 21: AI CHAT (POLISHED UI + CHAT TRIGGER)
 --========================================================
 
 AIPage = CreatePage("AI Chat")
@@ -6529,7 +6529,7 @@ AddText(AIPage, "AI CHAT", 32, C.Cyan, Enum.Font.GothamBold)
 AddText(AIPage, "Talk to a neural network", 22, C.Gray)
 
 AIChatCard = Create("Frame", {
-    Size = UDim2.new(1, 0, 0, 350),
+    Size = UDim2.new(1, 0, 0, 380),
     BackgroundColor3 = C.Card,
     BackgroundTransparency = 0.06,
     BorderSizePixel = 0
@@ -6539,7 +6539,7 @@ Round(AIChatCard, 12)
 Outline(AIChatCard, C.Cyan, 1, 0.5)
 
 AIScroll = Create("ScrollingFrame", {
-    Size = UDim2.new(1, -24, 0, 250),
+    Size = UDim2.new(1, -24, 0, 270),
     Position = UDim2.new(0, 12, 0, 12),
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
@@ -6549,17 +6549,29 @@ AIScroll = Create("ScrollingFrame", {
     ScrollBarImageColor3 = C.Cyan
 }, AIChatCard)
 
+Create("UIPadding", {
+    PaddingBottom = UDim.new(0, 10)
+}, AIScroll)
+
 Create("UIListLayout", {
-    Padding = UDim.new(0, 8),
+    Padding = UDim.new(0, 12),
     SortOrder = Enum.SortOrder.LayoutOrder
 }, AIScroll)
 
-AIInput = Create("TextBox", {
-    Size = UDim2.new(1, -80, 0, 40),
-    Position = UDim2.new(0, 12, 1, -54),
+AIInputBack = Create("Frame", {
+    Size = UDim2.new(1, -24, 0, 46),
+    Position = UDim2.new(0, 12, 1, -56),
     BackgroundColor3 = C.Background,
     BackgroundTransparency = 0.1,
-    BorderSizePixel = 0,
+    BorderSizePixel = 0
+}, AIChatCard)
+Round(AIInputBack, 10)
+Outline(AIInputBack, C.Cyan, 1, 0.4)
+
+AIInput = Create("TextBox", {
+    Size = UDim2.new(1, -60, 1, 0),
+    Position = UDim2.new(0, 12, 0, 0),
+    BackgroundTransparency = 1,
     Text = "",
     PlaceholderText = "Ask the AI anything...",
     PlaceholderColor3 = C.Gray,
@@ -6568,25 +6580,23 @@ AIInput = Create("TextBox", {
     Font = Enum.Font.Gotham,
     TextXAlignment = Enum.TextXAlignment.Left,
     ClearTextOnFocus = false
-}, AIChatCard)
-
-Round(AIInput, 8)
-Outline(AIInput, C.Blue, 1, 0.45)
+}, AIInputBack)
 
 AISendBtn = Create("TextButton", {
-    Size = UDim2.new(0, 56, 0, 40),
-    Position = UDim2.new(1, -68, 1, -54),
+    Size = UDim2.new(0, 40, 0, 34),
+    Position = UDim2.new(1, -46, 0.5, -17),
     BackgroundColor3 = C.Blue,
-    Text = "SEND",
+    Text = "▶",
     TextColor3 = C.White,
     Font = Enum.Font.GothamBold,
-    TextSize = 11,
+    TextSize = 14,
     BorderSizePixel = 0,
     AutoButtonColor = false
-}, AIChatCard)
+}, AIInputBack)
 
 Round(AISendBtn, 8)
 Outline(AISendBtn, C.Cyan, 1, 0.3)
+MakeGradient(AISendBtn, C.Blue2, C.Violet, 0)
 
 local HttpService = game:GetService("HttpService")
 local chatHistory = {}
@@ -6595,25 +6605,53 @@ local API_KEY = "sk_6rPAJbZoeRcyxPRKGYr7GzvoUOKlC5Y2"
 local API_URL = "https://gen.pollinations.ai/v1/chat/completions"
 
 function AddMessageToUI(text, isUser)
-    local msgFrame = Create("Frame", {
+    local container = Create("Frame", {
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundColor3 = isUser and C.Blue2 or C.Content,
-        BackgroundTransparency = 0.2,
-        BorderSizePixel = 0
+        BackgroundTransparency = 1
     }, AIScroll)
+
+    local msgFrame = Create("Frame", {
+        Size = UDim2.new(0.85, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = isUser and C.Blue2 or C.Content,
+        BackgroundTransparency = 0.1,
+        BorderSizePixel = 0,
+        AnchorPoint = isUser and Vector2.new(1, 0) or Vector2.new(0, 0),
+        Position = isUser and UDim2.new(1, 0, 0, 0) or UDim2.new(0, 0, 0, 0)
+    }, container)
     
-    Round(msgFrame, 8)
+    Round(msgFrame, 10)
+    
+    if isUser then
+        MakeGradient(msgFrame, C.Blue, C.Blue2, 90)
+        Outline(msgFrame, C.Cyan, 1, 0.6)
+    else
+        MakeGradient(msgFrame, C.Content, C.Card, 90)
+        Outline(msgFrame, C.Blue2, 1, 0.8)
+    end
     
     Create("UIPadding", {
-        PaddingTop = UDim.new(0, 8),
-        PaddingBottom = UDim.new(0, 8),
-        PaddingLeft = UDim.new(0, 8),
-        PaddingRight = UDim.new(0, 8)
+        PaddingTop = UDim.new(0, 10),
+        PaddingBottom = UDim.new(0, 10),
+        PaddingLeft = UDim.new(0, 12),
+        PaddingRight = UDim.new(0, 12)
     }, msgFrame)
     
+    local icon = Create("ImageLabel", {
+        Size = UDim2.fromOffset(24, 24),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = C.Background,
+        BorderSizePixel = 0,
+        Image = isUser and ("https://www.roblox.com/headshot-thumbnail/image?userId=" .. Player.UserId .. "&width=150&height=150&format=png") or "rbxassetid://7734034954",
+        ScaleType = Enum.ScaleType.Crop
+    }, msgFrame)
+    Round(icon, 12)
+    Outline(icon, isUser and C.Cyan or C.Violet, 1, 0)
+
     Create("TextLabel", {
-        Size = UDim2.new(1, 0, 0, 0),
+        Size = UDim2.new(1, -32, 0, 0),
+        Position = UDim2.new(0, 32, 0, 2),
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundTransparency = 1,
         Text = text,
@@ -6630,22 +6668,20 @@ function AddMessageToUI(text, isUser)
         AIScroll.CanvasPosition = Vector2.new(0, AIScroll.AbsoluteCanvasSize.Y)
     end)
     
-    return msgFrame
+    return container
 end
 
-AISendBtn.MouseButton1Click:Connect(function()
-    local prompt = AIInput.Text
+function ProcessAIRequest(prompt, sendToChat)
     if prompt == "" then return end
     
-    AIInput.Text = ""
-    AddMessageToUI("You: " .. prompt, true)
+    AddMessageToUI(prompt, true)
     table.insert(chatHistory, {role = "user", content = prompt})
     
     while #chatHistory > 20 do
         table.remove(chatHistory, 1)
     end
     
-    local thinkingFrame = AddMessageToUI("AI: ...thinking", false)
+    local thinkingFrame = AddMessageToUI("Thinking...", false)
     
     local success, response = pcall(function()
         local payload = HttpService:JSONEncode({
@@ -6679,12 +6715,53 @@ AISendBtn.MouseButton1Click:Connect(function()
         if ok and decoded and decoded.choices and decoded.choices[1] then
             local reply = decoded.choices[1].message.content
             table.insert(chatHistory, {role = "assistant", content = reply})
-            AddMessageToUI("AI: " .. reply, false)
+            AddMessageToUI(reply, false)
+            
+            -- Send to Roblox Chat if triggered from there
+            if sendToChat then
+                local TextChatService = game:GetService("TextChatService")
+                local targetChannel = TextChatService.ChatInputBarConfiguration.TargetTextChannel
+                if targetChannel then
+                    pcall(function() targetChannel:SendAsync(reply) end)
+                end
+            end
+            
         else
-            AddMessageToUI("AI: Bad response. Raw: " .. tostring(response):sub(1, 150), false)
+            AddMessageToUI("Error: Bad response format.", false)
         end
     else
-        AddMessageToUI("AI: Failed — " .. tostring(response):sub(1, 150), false)
+        AddMessageToUI("Error: " .. tostring(response):sub(1, 100), false)
+    end
+end
+
+AIInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        AISendBtn:Fire("MouseButton1Click")
+    end
+end)
+
+AISendBtn.MouseButton1Click:Connect(function()
+    local prompt = AIInput.Text
+    if prompt == "" then return end
+    AIInput.Text = ""
+    ProcessAIRequest(prompt, false) -- Send to UI only
+end)
+
+--========================================================
+-- CHAT TRIGGER ("kogane [message]")
+--========================================================
+
+local TextChatService = game:GetService("TextChatService")
+
+TextChatService.MessageReceived:Connect(function(message)
+    if not message.TextSource or message.TextSource.UserId ~= Player.UserId then return end
+    
+    local text = message.Text
+    if string.lower(string.sub(text, 1, 7)) == "kogane " then
+        local prompt = string.sub(text, 8)
+        if prompt ~= "" then
+            ProcessAIRequest(prompt, true) -- Send to UI AND public chat
+        end
     end
 end)
 
