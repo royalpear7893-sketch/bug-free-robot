@@ -6521,7 +6521,7 @@ end)
 print("PERFECT ANTI-EXPLOITER READY")
 
 --========================================================
--- PART 21: AI CHAT (HALF 1 - UI & SETUP)
+-- PART 21: AI CHAT (HALF 1)
 --========================================================
 
 AIPage = CreatePage("AI Chat")
@@ -6608,7 +6608,6 @@ local otherPlayersChats = {}
 local API_KEY = "sk_6rPAJbZoeRcyxPRKGYr7GzvoUOKlC5Y2"
 local API_URL = "https://gen.pollinations.ai/v1/chat/completions"
 
--- Listen to other players chatting
 TextChatService.MessageReceived:Connect(function(message)
     local sender = message.TextSource and Players:GetPlayerByUserId(message.TextSource.UserId)
     if sender and sender ~= Players.LocalPlayer then
@@ -6707,16 +6706,35 @@ function ProcessAIRequest(prompt, sendToChat)
         end
     end
             
+    -- If no specific name was found, but you said "my" or "me", scan YOUR avatar
     if not playerToScan and (string.find(lowerPrompt, " my ") or string.find(lowerPrompt, " me ") or lowerPrompt == "what does my avatar cost") then
         playerToScan = Player
+    end
+
+    -- FIX: If teleporting, ignore "me" and look for the actual target
+    if playerToScan == Player and (string.find(lowerPrompt, "teleport") or string.find(lowerPrompt, "tp")) and string.find(lowerPrompt, " to ") then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= Player then
+                local nameLower = string.lower(p.Name)
+                local displayNameLower = string.lower(p.DisplayName)
+                if string.find(lowerPrompt, "to " .. nameLower, 1, true) or string.find(lowerPrompt, "to " .. displayNameLower, 1, true) then
+                    playerToScan = p
+                    break
+                end
+            end
+        end
     end
     -- ==========================================
     -- SMART GUI COMMAND CONTROLLER
     -- ==========================================
     
-    -- List Commands
-    if string.find(lowerPrompt, "commands") or string.find(lowerPrompt, "help") then
-        AddMessageToUI("Commands: aim, esp, hitbox, speed [num], jump [num], tp/teleport, attach/follow, fullbright, reset, hop, rejoin, turn off all.", false)
+    -- Force Command List
+    if string.find(lowerPrompt, "command") or string.find(lowerPrompt, "help") or string.find(lowerPrompt, "what can you do") then
+        AddMessageToUI("📜 COMMAND LIST: aim [name], esp, hitbox, speed [num], jump [num], tp [name], attach [name], fullbright, reset, hop, rejoin, turn off all.", false)
+        if sendToChat then
+            local targetChannel = TextChatService.ChatInputBarConfiguration.TargetTextChannel
+            if targetChannel then pcall(function() targetChannel:SendAsync("COMMAND LIST: aim, esp, hitbox, speed, jump, tp, attach, fullbright, reset, hop, rejoin, off all.") end) end
+        end
         return
     end
 
@@ -6888,9 +6906,7 @@ function ProcessAIRequest(prompt, sendToChat)
                         
                         if #assetNames > 0 then
                             avatarDataString = playerToScan.Name .. " is wearing: " .. table.concat(assetNames, ", ") .. ". Total purchasable cost: " .. tostring(totalCost) .. " Robux. "
-                            if offSaleCount > 0 then
-                                avatarDataString = avatarDataString .. "They also have " .. tostring(offSaleCount) .. " deleted/rare items. "
-                            end
+                            if offSaleCount > 0 then avatarDataString = avatarDataString .. "They also have " .. tostring(offSaleCount) .. " deleted/rare items. " end
                         else
                             avatarDataString = playerToScan.Name .. " is not wearing any purchasable items. "
                         end
