@@ -6521,7 +6521,7 @@ end)
 print("PERFECT ANTI-EXPLOITER READY")
 
 --========================================================
--- PART 21: AI CHAT
+-- PART 21: AI CHAT (FIXED)
 --========================================================
 
 AIPage = CreatePage("AI Chat")
@@ -6538,7 +6538,6 @@ AIChatCard = Create("Frame", {
 Round(AIChatCard, 12)
 Outline(AIChatCard, C.Cyan, 1, 0.5)
 
--- Chat History Scroll
 AIScroll = Create("ScrollingFrame", {
     Size = UDim2.new(1, -24, 0, 250),
     Position = UDim2.new(0, 12, 0, 12),
@@ -6555,7 +6554,6 @@ Create("UIListLayout", {
     SortOrder = Enum.SortOrder.LayoutOrder
 }, AIScroll)
 
--- Text Input
 AIInput = Create("TextBox", {
     Size = UDim2.new(1, -80, 0, 40),
     Position = UDim2.new(0, 12, 1, -54),
@@ -6575,7 +6573,6 @@ AIInput = Create("TextBox", {
 Round(AIInput, 8)
 Outline(AIInput, C.Blue, 1, 0.45)
 
--- Send Button
 AISendBtn = Create("TextButton", {
     Size = UDim2.new(0, 56, 0, 40),
     Position = UDim2.new(1, -68, 1, -54),
@@ -6593,6 +6590,9 @@ Outline(AISendBtn, C.Cyan, 1, 0.3)
 
 local HttpService = game:GetService("HttpService")
 local chatHistory = {}
+
+local API_KEY = "sk_6rPAJbZoeRcyxPRKGYr7GzvoUOKlC5Y2"
+local API_URL = "https://gen.pollinations.ai/v1/chat/completions"
 
 function AddMessageToUI(text, isUser)
     local msgFrame = Create("Frame", {
@@ -6625,11 +6625,12 @@ function AddMessageToUI(text, isUser)
         TextYAlignment = Enum.TextYAlignment.Top
     }, msgFrame)
     
-    -- Auto-scroll to bottom
     task.defer(function()
         task.wait(0.1)
         AIScroll.CanvasPosition = Vector2.new(0, AIScroll.AbsoluteCanvasSize.Y)
     end)
+    
+    return msgFrame
 end
 
 AISendBtn.MouseButton1Click:Connect(function()
@@ -6640,8 +6641,11 @@ AISendBtn.MouseButton1Click:Connect(function()
     AddMessageToUI("You: " .. prompt, true)
     table.insert(chatHistory, {role = "user", content = prompt})
     
-    -- Add temp "Thinking..." message
-    AddMessageToUI("AI: ...thinking", false)
+    while #chatHistory > 20 do
+        table.remove(chatHistory, 1)
+    end
+    
+    local thinkingFrame = AddMessageToUI("AI: ...thinking", false)
     
     local success, response = pcall(function()
         local payload = HttpService:JSONEncode({
@@ -6649,30 +6653,38 @@ AISendBtn.MouseButton1Click:Connect(function()
             model = "openai"
         })
         
-        return HttpService:PostAsync(
-            "https://text.pollinations.ai/openai",
-            payload,
-            Enum.HttpContentType.ApplicationJson
-        )
+        local reqFunc = syn and syn.request or request
+        if not reqFunc then error("Executor lacks HTTP request function") end
+        
+        local res = reqFunc({
+            Url = API_URL,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+                ["Authorization"] = "Bearer " .. API_KEY
+            },
+            Body = payload
+        })
+        
+        if not res.Success then
+            error("HTTP " .. res.StatusCode .. ": " .. tostring(res.Body):sub(1, 150))
+        end
+        return res.Body
     end)
     
-    -- Remove the "Thinking..." message (last child of scroll)
-    local children = AIScroll:GetChildren()
-    for i = #children, 1, -1 do
-        if children[i]:IsA("Frame") then
-            children[i]:Destroy()
-            break
-        end
-    end
+    if thinkingFrame then thinkingFrame:Destroy() end
     
     if success then
-        local decoded = HttpService:JSONDecode(response)
-        local reply = decoded.choices[1].message.content
-        
-        table.insert(chatHistory, {role = "assistant", content = reply})
-        AddMessageToUI("AI: " .. reply, false)
+        local ok, decoded = pcall(function() return HttpService:JSONDecode(response) end)
+        if ok and decoded and decoded.choices and decoded.choices[1] then
+            local reply = decoded.choices[1].message.content
+            table.insert(chatHistory, {role = "assistant", content = reply})
+            AddMessageToUI("AI: " .. reply, false)
+        else
+            AddMessageToUI("AI: Bad response. Raw: " .. tostring(response):sub(1, 150), false)
+        end
     else
-        AddMessageToUI("AI: Failed to connect to the neural network. (Error: " .. tostring(response) .. ")", false)
+        AddMessageToUI("AI: Failed — " .. tostring(response):sub(1, 150), false)
     end
 end)
 
