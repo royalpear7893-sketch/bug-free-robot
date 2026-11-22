@@ -6521,7 +6521,7 @@ end)
 print("PERFECT ANTI-EXPLOITER READY")
 
 --========================================================
--- PART 21: AI CHAT (UI, SMART SCANNER, TRANSLATOR, COMMANDS)
+-- PART 21: AI CHAT (HALF 1 - UI & SETUP)
 --========================================================
 
 AIPage = CreatePage("AI Chat")
@@ -6692,74 +6692,105 @@ function ProcessAIRequest(prompt, sendToChat)
     local lowerPrompt = string.lower(prompt)
     local playerToScan = nil
     
-    -- 1. Fuzzy Player Detection (Scans by partial name or display name)
+    -- 1. Fuzzy Player Detection
     for word in string.gmatch(lowerPrompt, "%a+") do
-        -- Ignore common words so it doesn't accidentally match them to players
         if word ~= "kogane" and word ~= "what" and word ~= "is" and word ~= "the" and word ~= "aim" and word ~= "at" and word ~= "translate" and word ~= "saying" and word ~= "wearing" and word ~= "cost" and word ~= "turn" and word ~= "on" and word ~= "off" and word ~= "esp" and word ~= "hitbox" and word ~= "speed" and word ~= "my" and word ~= "me" then
-            
             for _, p in ipairs(Players:GetPlayers()) do
                 local nameLower = string.lower(p.Name)
                 local displayNameLower = string.lower(p.DisplayName)
-                
-                -- If the word is inside their username or display name
                 if string.find(nameLower, word, 1, true) or string.find(displayNameLower, word, 1, true) then
                     playerToScan = p
                     break
                 end
             end
-            
-            if playerToScan then break end -- Stop searching if we found someone
+            if playerToScan then break end
         end
     end
             
-    -- If no specific name was found, but you said "my" or "me", scan YOUR avatar
     if not playerToScan and (string.find(lowerPrompt, " my ") or string.find(lowerPrompt, " me ") or lowerPrompt == "what does my avatar cost") then
         playerToScan = Player
     end
-
     -- ==========================================
-    -- GUI COMMAND CONTROLLER
+    -- SMART GUI COMMAND CONTROLLER
     -- ==========================================
-    if string.find(lowerPrompt, "aim at") or string.find(lowerPrompt, "aimbot on") then
-        if playerToScan then
-            AimModeCamera = true
-            AimManualTarget = playerToScan
-            AimTargetMode = "MANUAL"
-            AimActive = true
-            if StartBtn then 
-                StartBtn.Text = "STOP AIMBOT" 
-                StartBtn.BackgroundColor3 = C.Red
-            end
-            AddMessageToUI("✅ Aimbot locked onto " .. playerToScan.Name, true)
-            return
-        end
-    elseif string.find(lowerPrompt, "turn on esp") or string.find(lowerPrompt, "enable esp") then
-        ESPActive = true
-        if RefreshAllESP then RefreshAllESP() end
-        if ESPToggleBtn then 
-            ESPToggleBtn.BackgroundColor3 = C.Blue
-            ESPToggleKnob.Position = UDim2.new(1, -19, 0.5, -8)
-        end
-        AddMessageToUI("✅ Player ESP Enabled", true)
+    
+    -- List Commands
+    if string.find(lowerPrompt, "commands") or string.find(lowerPrompt, "help") then
+        AddMessageToUI("Commands: aim, esp, hitbox, speed [num], jump [num], tp/teleport, attach/follow, fullbright, reset, hop, rejoin, turn off all.", false)
         return
-    elseif string.find(lowerPrompt, "turn off esp") or string.find(lowerPrompt, "disable esp") then
+    end
+
+    -- Server Hop & Rejoin
+    if string.find(lowerPrompt, "hop") or string.find(lowerPrompt, "new server") then
+        AddMessageToUI("🌐 Hopping servers...", true)
+        if HopBtn then HopBtn:Fire("MouseButton1Click") end
+        return
+    elseif string.find(lowerPrompt, "rejoin") then
+        AddMessageToUI("🔄 Rejoining server...", true)
+        if RejoinBtn then RejoinBtn:Fire("MouseButton1Click") end
+        return
+    end
+
+    -- Turn off all
+    if (string.find(lowerPrompt, "turn off all") or string.find(lowerPrompt, "disable all") or string.find(lowerPrompt, "stop everything")) then
+        AimActive = false
+        if StartBtn then StartBtn.Text = "START AIMBOT"; StartBtn.BackgroundColor3 = C.Blue end
         ESPActive = false
         if RemoveAllESP then RemoveAllESP() end
-        if ESPToggleBtn then 
-            ESPToggleBtn.BackgroundColor3 = C.Background
-            ESPToggleKnob.Position = UDim2.fromOffset(3, 3)
-        end
-        AddMessageToUI("❌ Player ESP Disabled", true)
+        if ESPToggleBtn then ESPToggleBtn.BackgroundColor3 = C.Background; ESPToggleKnob.Position = UDim2.fromOffset(3, 3) end
+        HitboxActive = false
+        if RefreshHitboxes then RefreshHitboxes() end
+        if HitboxToggleBtn then HitboxToggleBtn.BackgroundColor3 = C.Background; HitboxToggleKnob.Position = UDim2.fromOffset(3, 3) end
+        AttachActive = false
+        if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Background; AttachToggleKnob.Position = UDim2.fromOffset(3, 3) end
+        if FullbrightActive then if FullbrightBtn then FullbrightBtn:Fire("MouseButton1Click") end end
+        AddMessageToUI("🛑 ALL FEATURES DISABLED", true)
         return
-    elseif string.find(lowerPrompt, "hitbox") and string.find(lowerPrompt, "on") then
+    end
+
+    -- Individual Stops
+    if string.find(lowerPrompt, "stop") or string.find(lowerPrompt, "off") or string.find(lowerPrompt, "disable") then
+        if string.find(lowerPrompt, "aim") then
+            AimActive = false
+            if StartBtn then StartBtn.Text = "START AIMBOT"; StartBtn.BackgroundColor3 = C.Blue end
+            AddMessageToUI("❌ Aimbot Disabled", true); return
+        elseif string.find(lowerPrompt, "esp") then
+            ESPActive = false
+            if RemoveAllESP then RemoveAllESP() end
+            if ESPToggleBtn then ESPToggleBtn.BackgroundColor3 = C.Background; ESPToggleKnob.Position = UDim2.fromOffset(3, 3) end
+            AddMessageToUI("❌ ESP Disabled", true); return
+        elseif string.find(lowerPrompt, "hitbox") then
+            HitboxActive = false
+            if RefreshHitboxes then RefreshHitboxes() end
+            if HitboxToggleBtn then HitboxToggleBtn.BackgroundColor3 = C.Background; HitboxToggleKnob.Position = UDim2.fromOffset(3, 3) end
+            AddMessageToUI("❌ Hitbox Disabled", true); return
+        elseif string.find(lowerPrompt, "attach") or string.find(lowerPrompt, "follow") then
+            AttachActive = false
+            if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Background; AttachToggleKnob.Position = UDim2.fromOffset(3, 3) end
+            AddMessageToUI("❌ Attach Disabled", true); return
+        elseif string.find(lowerPrompt, "fullbright") or string.find(lowerPrompt, "light") then
+            if FullbrightActive then if FullbrightBtn then FullbrightBtn:Fire("MouseButton1Click") end; AddMessageToUI("❌ Fullbright Disabled", true) end
+            return
+        end
+    end
+
+    -- Actions
+    if string.find(lowerPrompt, "aim") then
+        if playerToScan then
+            AimModeCamera = true; AimManualTarget = playerToScan; AimTargetMode = "MANUAL"; AimActive = true
+            if StartBtn then StartBtn.Text = "STOP AIMBOT"; StartBtn.BackgroundColor3 = C.Red end
+            AddMessageToUI("✅ Aimbot locked onto " .. playerToScan.Name, true); return
+        end
+    elseif string.find(lowerPrompt, "esp") or string.find(lowerPrompt, "see") then
+        ESPActive = true
+        if RefreshAllESP then RefreshAllESP() end
+        if ESPToggleBtn then ESPToggleBtn.BackgroundColor3 = C.Blue; ESPToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
+        AddMessageToUI("✅ Player ESP Enabled", true); return
+    elseif string.find(lowerPrompt, "hitbox") or string.find(lowerPrompt, "big") then
         HitboxActive = true
         if RefreshHitboxes then RefreshHitboxes() end
-        if HitboxToggleBtn then 
-            HitboxToggleBtn.BackgroundColor3 = C.Blue
-            HitboxToggleKnob.Position = UDim2.new(1, -19, 0.5, -8)
-        end
-        AddMessageToUI("✅ Hitbox Expander Enabled", true)
-        return
+        if HitboxToggleBtn then HitboxToggleBtn.BackgroundColor3 = C.Blue; HitboxToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
+        AddMessageToUI("✅ Hitbox Expander Enabled", true); return
     elseif string.find(lowerPrompt, "speed") then
         local newSpeed = tonumber(string.match(lowerPrompt, "%d+"))
         if newSpeed then
@@ -6767,9 +6798,41 @@ function ProcessAIRequest(prompt, sendToChat)
             local char = Player.Character
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             if hum then hum.WalkSpeed = newSpeed end
-            AddMessageToUI("✅ Speed set to " .. newSpeed, true)
+            AddMessageToUI("✅ Speed set to " .. newSpeed, true); return
+        end
+    elseif string.find(lowerPrompt, "jump") then
+        local newJump = tonumber(string.match(lowerPrompt, "%d+"))
+        if newJump then
+            JumpCurrent = newJump
+            local char = Player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.UseJumpPower = true; hum.JumpPower = newJump end
+            AddMessageToUI("✅ Jump Power set to " .. newJump, true); return
+        end
+    elseif string.find(lowerPrompt, "teleport") or string.find(lowerPrompt, "tp") then
+        if playerToScan then
+            local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+            local targetRoot = playerToScan.Character and playerToScan.Character:FindFirstChild("HumanoidRootPart")
+            if myRoot and targetRoot then
+                myRoot.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0)
+                AddMessageToUI("✅ Teleported to " .. playerToScan.Name, true)
+            else
+                AddMessageToUI("❌ Target not found or dead.", true)
+            end
             return
         end
+    elseif string.find(lowerPrompt, "attach") or string.find(lowerPrompt, "follow") then
+        if playerToScan then
+            AttachTarget = playerToScan; AttachActive = true
+            if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Blue; AttachToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
+            AddMessageToUI("✅ Attached to " .. playerToScan.Name, true); return
+        end
+    elseif string.find(lowerPrompt, "fullbright") or string.find(lowerPrompt, "light") then
+        if not FullbrightActive then if FullbrightBtn then FullbrightBtn:Fire("MouseButton1Click") end; AddMessageToUI("✅ Fullbright Enabled", true) end
+        return
+    elseif string.find(lowerPrompt, "reset") or string.find(lowerPrompt, "die") or string.find(lowerPrompt, "kill me") then
+        if ResetButton then ResetButton:Fire("MouseButton1Click") end
+        AddMessageToUI("✅ Resetting character", true); return
     end
 
     -- ==========================================
@@ -6788,43 +6851,46 @@ function ProcessAIRequest(prompt, sendToChat)
         local success, response = pcall(function()
             local avatarDataString = "User did not specify a player to scan. "
             
-            -- Avatar Scanner
             if playerToScan then
                 local wearingUrl = "https://avatar.roblox.com/v1/users/" .. playerToScan.UserId .. "/currently-wearing"
-                local wearSuccess, wearRes = pcall(function() 
-                    return request({Url = wearingUrl, Method = "GET"}).Body 
-                end)
+                local wearSuccess, wearRes = pcall(function() return request({Url = wearingUrl, Method = "GET"}).Body end)
                 
                 if wearSuccess and wearRes then
                     local ok, wearData = pcall(function() return HttpService:JSONDecode(wearRes) end)
                     if ok and wearData and wearData.assets then
                         local assetIds = {}
                         local assetNames = {}
+                        local totalCost = 0
+                        local offSaleCount = 0
                         
-                        for _, asset in ipairs(wearData.assets) do
-                            table.insert(assetIds, tostring(asset.id))
-                        end
+                        for _, asset in ipairs(wearData.assets) do table.insert(assetIds, tostring(asset.id)) end
                         
                         if #assetIds > 0 then
                             local priceUrl = "https://catalog.roblox.com/v1/catalog/items/details?ids=" .. table.concat(assetIds, ",")
-                            local priceSuccess, priceRes = pcall(function()
-                                return request({Url = priceUrl, Method = "GET"}).Body
-                            end)
+                            local priceSuccess, priceRes = pcall(function() return request({Url = priceUrl, Method = "GET"}).Body end)
                             
                             if priceSuccess and priceRes then
                                 local pOk, priceData = pcall(function() return HttpService:JSONDecode(priceRes) end)
                                 if pOk and priceData and priceData.data then
                                     for _, item in ipairs(priceData.data) do
-                                        local price = item.price or "Off-Sale"
                                         local name = item.name or "Unknown Item"
-                                        table.insert(assetNames, name .. " (" .. tostring(price) .. " R$)")
+                                        if item.price and item.price > 0 then
+                                            table.insert(assetNames, name .. " (" .. tostring(item.price) .. " R$)")
+                                            totalCost = totalCost + item.price
+                                        else
+                                            table.insert(assetNames, name .. " (Deleted/Rare Item)")
+                                            offSaleCount = offSaleCount + 1
+                                        end
                                     end
                                 end
                             end
                         end
                         
                         if #assetNames > 0 then
-                            avatarDataString = playerToScan.Name .. " is wearing: " .. table.concat(assetNames, ", ") .. ". "
+                            avatarDataString = playerToScan.Name .. " is wearing: " .. table.concat(assetNames, ", ") .. ". Total purchasable cost: " .. tostring(totalCost) .. " Robux. "
+                            if offSaleCount > 0 then
+                                avatarDataString = avatarDataString .. "They also have " .. tostring(offSaleCount) .. " deleted/rare items. "
+                            end
                         else
                             avatarDataString = playerToScan.Name .. " is not wearing any purchasable items. "
                         end
@@ -6832,7 +6898,6 @@ function ProcessAIRequest(prompt, sendToChat)
                 end
             end
             
-            -- Chat Translator Context
             local chatContext = ""
             if #otherPlayersChats > 0 then
                 chatContext = " Recent chat from other players: " .. table.concat(otherPlayersChats, " | ")
@@ -6851,31 +6916,19 @@ function ProcessAIRequest(prompt, sendToChat)
             end
             
             local tempHistory = {{role = "system", content = systemPrompt}}
-            for _, msg in ipairs(chatHistory) do
-                table.insert(tempHistory, msg)
-            end
+            for _, msg in ipairs(chatHistory) do table.insert(tempHistory, msg) end
             
-            local payload = HttpService:JSONEncode({
-                messages = tempHistory,
-                model = "openai"
-            })
-            
+            local payload = HttpService:JSONEncode({ messages = tempHistory, model = "openai" })
             local reqFunc = syn and syn.request or request
             if not reqFunc then error("Executor lacks HTTP request function") end
             
             local res = reqFunc({
-                Url = API_URL,
-                Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json",
-                    ["Authorization"] = "Bearer " .. API_KEY
-                },
+                Url = API_URL, Method = "POST",
+                Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. API_KEY },
                 Body = payload
             })
             
-            if not res.Success then
-                error("HTTP " .. res.StatusCode .. ": " .. tostring(res.Body):sub(1, 150))
-            end
+            if not res.Success then error("HTTP " .. res.StatusCode .. ": " .. tostring(res.Body):sub(1, 150)) end
             return res.Body
         end)
         
@@ -6890,9 +6943,7 @@ function ProcessAIRequest(prompt, sendToChat)
                 
                 if sendToChat then
                     local targetChannel = TextChatService.ChatInputBarConfiguration.TargetTextChannel
-                    if targetChannel then
-                        pcall(function() targetChannel:SendAsync(reply) end)
-                    end
+                    if targetChannel then pcall(function() targetChannel:SendAsync(reply) end) end
                 end
             else
                 AddMessageToUI("Error: Bad response format.", false)
@@ -6904,9 +6955,7 @@ function ProcessAIRequest(prompt, sendToChat)
 end
 
 AIInput.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        AISendBtn:Fire("MouseButton1Click")
-    end
+    if enterPressed then AISendBtn:Fire("MouseButton1Click") end
 end)
 
 AISendBtn.MouseButton1Click:Connect(function()
@@ -6922,13 +6971,10 @@ end)
 
 TextChatService.MessageReceived:Connect(function(message)
     if not message.TextSource or message.TextSource.UserId ~= Player.UserId then return end
-    
     local text = message.Text
     if string.lower(string.sub(text, 1, 7)) == "kogane " then
         local prompt = string.sub(text, 8)
-        if prompt ~= "" then
-            ProcessAIRequest(prompt, true)
-        end
+        if prompt ~= "" then ProcessAIRequest(prompt, true) end
     end
 end)
 
