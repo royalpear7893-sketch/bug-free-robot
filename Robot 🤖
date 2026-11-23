@@ -6667,23 +6667,29 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
         -- COMBAT MODES
         if string.find(lowerPrompt, "active combat mode extreme") then
             if playerToScan then
-                AttachMode = "Normal" -- Force normal mode
+                AttachMode = "Normal"
                 if ModeButtons and ModeButtons[1] then ModeButtons[1].BackgroundColor3 = C.Blue; if ModeButtons[2] then ModeButtons[2].BackgroundColor3 = C.Background end end
-                AttachTarget = playerToScan; AttachActive = true; AttachDistance = 5
-                if RebuildAttachConstraints then RebuildAttachConstraints() end; if SetNoclip then SetNoclip(true) end
+                
+                AttachTarget = playerToScan; AttachActive = true; AttachDistance = 6; AttachHeight = 0
+                if DestroyAttachConstraints then DestroyAttachConstraints() end
+                if SetNoclip then SetNoclip(true) end
+                
+                local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                local tRoot = playerToScan.Character and playerToScan.Character:FindFirstChild("HumanoidRootPart")
+                if myRoot and tRoot then
+                    local behindPos = tRoot.CFrame.Position - (tRoot.CFrame.LookVector * 6) + Vector3.new(0, 0, 0)
+                    myRoot.CFrame = CFrame.lookAt(behindPos, tRoot.Position)
+                    myRoot.Velocity = Vector3.zero
+                end
+                
+                if RebuildAttachConstraints then RebuildAttachConstraints() end
                 if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Blue; AttachToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
-                task.spawn(function()
-                    task.wait(0.1)
-                    local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                    local tRoot = playerToScan.Character and playerToScan.Character:FindFirstChild("HumanoidRootPart")
-                    if myRoot and tRoot then myRoot.CFrame = tRoot.CFrame + Vector3.new(0, 3, 0); myRoot.Velocity = Vector3.zero end
-                end)
             end
             HitboxActive = true; HitboxSize = 50; if RefreshHitboxes then RefreshHitboxes() end
             if HitboxToggleBtn then HitboxToggleBtn.BackgroundColor3 = C.Blue; HitboxToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
             ESPActive = true; if RefreshAllESP then RefreshAllESP() end
             if ESPToggleBtn then ESPToggleBtn.BackgroundColor3 = C.Blue; ESPToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
-            AddMessageToUI("💀 EXTREME COMBAT: Attached + Hitbox (50) + ESP", true); return
+            AddMessageToUI("💀 EXTREME COMBAT: Attached (6 studs) + Hitbox (50) + ESP", true); return
         elseif string.find(lowerPrompt, "active combat mode") then
             HitboxActive = true; HitboxSize = 50; if RefreshHitboxes then RefreshHitboxes() end
             if HitboxToggleBtn then HitboxToggleBtn.BackgroundColor3 = C.Blue; HitboxToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
@@ -6740,21 +6746,26 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
             if playerToScan then 
                 AttachMode = "Normal"
                 if ModeButtons and ModeButtons[1] then ModeButtons[1].BackgroundColor3 = C.Blue; if ModeButtons[2] then ModeButtons[2].BackgroundColor3 = C.Background end end
-                AttachTarget = playerToScan; AttachActive = true
-                if RebuildAttachConstraints then RebuildAttachConstraints() end
+                
+                AttachTarget = playerToScan; AttachActive = true; AttachDistance = 6; AttachHeight = 0
+                if DestroyAttachConstraints then DestroyAttachConstraints() end
                 if SetNoclip then SetNoclip(true) end
+                
+                local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                local tRoot = playerToScan.Character and playerToScan.Character:FindFirstChild("HumanoidRootPart")
+                if myRoot and tRoot then
+                    local behindPos = tRoot.CFrame.Position - (tRoot.CFrame.LookVector * 6) + Vector3.new(0, 0, 0)
+                    myRoot.CFrame = CFrame.lookAt(behindPos, tRoot.Position)
+                    myRoot.Velocity = Vector3.zero
+                end
+                
+                if RebuildAttachConstraints then RebuildAttachConstraints() end
                 if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Blue; AttachToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
-                task.spawn(function()
-                    task.wait(0.1)
-                    local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                    local tRoot = playerToScan.Character and playerToScan.Character:FindFirstChild("HumanoidRootPart")
-                    if myRoot and tRoot then myRoot.CFrame = tRoot.CFrame + Vector3.new(0, 3, 0); myRoot.Velocity = Vector3.zero end
-                end)
                 AddMessageToUI("✅ Attached to " .. playerToScan.Name .. " (Normal)", true); return 
             end
         end
         
-        -- Unknown Command (Stops AI from talking)
+        -- Unknown Command
         AddMessageToUI("❌ Unknown command. Say 'jarvis commands' to see the list.", false)
         return
     end
@@ -6866,3 +6877,4 @@ TextChatService.MessageReceived:Connect(function(msg)
 end)
 
 print("PERFECT AI CHAT READY")
+
