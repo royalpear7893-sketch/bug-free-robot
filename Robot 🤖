@@ -6649,7 +6649,8 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
             end
         end
     end
--- ==========================================
+
+    -- ==========================================
     -- JARVIS COMMAND CONTROLLER
     -- ==========================================
     if isCommand then
@@ -6657,8 +6658,8 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
         if string.find(lowerPrompt, "stop perfect") or string.find(lowerPrompt, "kill switch") then
             AimActive = false; ESPActive = false; HitboxActive = false; AttachActive = false
             if RemoveAllESP then RemoveAllESP() end; if RefreshHitboxes then RefreshHitboxes() end; if DestroyAttachConstraints then DestroyAttachConstraints() end; if SetNoclip then SetNoclip(false) end
-            local targetChannel = TextChatService.ChatInputBarConfiguration.TargetTextChannel
-            if targetChannel then pcall(function() targetChannel:SendAsync("System Halted. Goodbye.") end) end
+            local tc = TextChatService.ChatInputBarConfiguration.TargetTextChannel
+            if tc then pcall(function() tc:SendAsync("System Halted. Goodbye.") end) end
             if GUI then GUI:Destroy() end
             return
         end
@@ -6667,72 +6668,34 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
         if string.find(lowerPrompt, "command") or string.find(lowerPrompt, "help") then
             AddMessageToUI("📜 JARVIS TRIGGERS:", false)
             AddMessageToUI("• jarvis aim at [name]", false)
-            AddMessageToUI("• jarvis turn on esp", false)
+            AddMessageToUI("• jarvis esp", false)
             AddMessageToUI("• jarvis hitbox", false)
             AddMessageToUI("• jarvis speed [num]", false)
             AddMessageToUI("• jarvis jump [num]", false)
             AddMessageToUI("• jarvis tp to [name]", false)
-            AddMessageToUI("• jarvis attach [name]", false)
             AddMessageToUI("• jarvis fullbright", false)
             AddMessageToUI("• jarvis reset", false)
             AddMessageToUI("• jarvis rejoin", false)
             AddMessageToUI("• jarvis hop", false)
-            AddMessageToUI("• jarvis active combat mode", false)
-            AddMessageToUI("• jarvis active combat mode extreme [name]", false)
-            AddMessageToUI("• jarvis disable combat mode", false)
+            AddMessageToUI("• jarvis combat mode", false)
+            AddMessageToUI("• jarvis disable combat", false)
             AddMessageToUI("• jarvis turn off all", false)
-            AddMessageToUI("• jarvis stop perfect (Kill Switch)", false)
+            AddMessageToUI("• jarvis stop perfect", false)
             return
         end
 
-        -- COMBAT MODES
-        if string.find(lowerPrompt, "active combat mode extreme") then
-            if playerToScan then
-                AttachMode = "Normal"
-                if ModeButtons and ModeButtons[1] then ModeButtons[1].BackgroundColor3 = C.Blue; if ModeButtons[2] then ModeButtons[2].BackgroundColor3 = C.Background end end
-                
-                AttachTarget = playerToScan; AttachActive = true; AttachDistance = 6; AttachHeight = 0
-                if DestroyAttachConstraints then DestroyAttachConstraints() end
-                if SetNoclip then SetNoclip(true) end
-                
-                local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                local tRoot = playerToScan.Character and playerToScan.Character:FindFirstChild("HumanoidRootPart")
-                if myRoot and tRoot then
-                    local behindPos = tRoot.CFrame.Position - (tRoot.CFrame.LookVector * 6) + Vector3.new(0, 0, 0)
-                    myRoot.CFrame = CFrame.lookAt(behindPos, tRoot.Position)
-                    myRoot.Velocity = Vector3.zero
-                end
-                if RebuildAttachConstraints then RebuildAttachConstraints() end
-                if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Blue; AttachToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
-            end
+        -- COMBAT MODE
+        if string.find(lowerPrompt, "combat mode") or string.find(lowerPrompt, "active combat") then
             HitboxActive = true; HitboxSize = 50; 
             if HitboxSizeValue then HitboxSizeValue.Text = "50" end
             if HitboxSizeTrack then 
-                local trackWidth = HitboxSizeTrack.AbsoluteSize.X
-                if trackWidth > 0 then
-                    local relative = (50 - HITBOX_MIN) / (HITBOX_MAX - HITBOX_MIN)
-                    local knobPos = relative * trackWidth
-                    HitboxSizeKnob.Position = UDim2.new(0, knobPos - 9, 0.5, -9)
-                    HitboxSizeKnobGlow.Position = UDim2.new(0, knobPos - 13, 0.5, -13)
-                    HitboxSizeFill.Size = UDim2.new(relative, 0, 1, 0)
-                end
-            end
-            if RefreshHitboxes then RefreshHitboxes() end
-            if HitboxToggleBtn then HitboxToggleBtn.BackgroundColor3 = C.Blue; HitboxToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
-            ESPActive = true; if RefreshAllESP then RefreshAllESP() end
-            if ESPToggleBtn then ESPToggleBtn.BackgroundColor3 = C.Blue; ESPToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
-            AddMessageToUI("💀 EXTREME COMBAT: Attached (6) + Hitbox (50) + ESP", true); return
-        elseif string.find(lowerPrompt, "active combat mode") then
-            HitboxActive = true; HitboxSize = 50; 
-            if HitboxSizeValue then HitboxSizeValue.Text = "50" end
-            if HitboxSizeTrack then 
-                local trackWidth = HitboxSizeTrack.AbsoluteSize.X
-                if trackWidth > 0 then
-                    local relative = (50 - HITBOX_MIN) / (HITBOX_MAX - HITBOX_MIN)
-                    local knobPos = relative * trackWidth
-                    HitboxSizeKnob.Position = UDim2.new(0, knobPos - 9, 0.5, -9)
-                    HitboxSizeKnobGlow.Position = UDim2.new(0, knobPos - 13, 0.5, -13)
-                    HitboxSizeFill.Size = UDim2.new(relative, 0, 1, 0)
+                local tw = HitboxSizeTrack.AbsoluteSize.X
+                if tw > 0 then
+                    local rel = (50 - HITBOX_MIN) / (HITBOX_MAX - HITBOX_MIN)
+                    local kp = rel * tw
+                    HitboxSizeKnob.Position = UDim2.new(0, kp - 9, 0.5, -9)
+                    HitboxSizeKnobGlow.Position = UDim2.new(0, kp - 13, 0.5, -13)
+                    HitboxSizeFill.Size = UDim2.new(rel, 0, 1, 0)
                 end
             end
             if RefreshHitboxes then RefreshHitboxes() end
@@ -6742,11 +6705,10 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
             AddMessageToUI("⚔️ COMBAT MODE: Hitbox (50) + ESP", true); return
         end
 
-        -- DISABLE COMBAT MODE
-        if string.find(lowerPrompt, "disable combat") or string.find(lowerPrompt, "stop combat") or string.find(lowerPrompt, "turn off combat") then
+        -- DISABLE COMBAT
+        if string.find(lowerPrompt, "disable combat") or string.find(lowerPrompt, "stop combat") then
             HitboxActive = false; if RefreshHitboxes then RefreshHitboxes() end; if HitboxToggleBtn then HitboxToggleBtn.BackgroundColor3 = C.Background; HitboxToggleKnob.Position = UDim2.fromOffset(3, 3) end
             ESPActive = false; if RemoveAllESP then RemoveAllESP() end; if ESPToggleBtn then ESPToggleBtn.BackgroundColor3 = C.Background; ESPToggleKnob.Position = UDim2.fromOffset(3, 3) end
-            AttachActive = false; if DestroyAttachConstraints then DestroyAttachConstraints() end; if SetNoclip then SetNoclip(false) end; if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Background; AttachToggleKnob.Position = UDim2.fromOffset(3, 3) end
             AddMessageToUI("🛑 COMBAT MODE DISABLED", true); return
         end
 
@@ -6766,17 +6728,15 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
             AimActive = false; if StartBtn then StartBtn.Text = "START AIMBOT"; StartBtn.BackgroundColor3 = C.Blue end
             ESPActive = false; if RemoveAllESP then RemoveAllESP() end; if ESPToggleBtn then ESPToggleBtn.BackgroundColor3 = C.Background; ESPToggleKnob.Position = UDim2.fromOffset(3, 3) end
             HitboxActive = false; if RefreshHitboxes then RefreshHitboxes() end; if HitboxToggleBtn then HitboxToggleBtn.BackgroundColor3 = C.Background; HitboxToggleKnob.Position = UDim2.fromOffset(3, 3) end
-            AttachActive = false; if DestroyAttachConstraints then DestroyAttachConstraints() end; if SetNoclip then SetNoclip(false) end; if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Background; AttachToggleKnob.Position = UDim2.fromOffset(3, 3) end
             if FullbrightActive then FullbrightActive = false; Lighting.Brightness = originalBrightness; Lighting.OutdoorAmbient = originalOutdoor; Lighting.Ambient = originalAmbient; Lighting.GlobalShadows = originalShadows; Lighting.FogEnd = originalFog; if FullbrightBtn then FullbrightBtn.BackgroundColor3 = C.Background; FullbrightKnob.Position = UDim2.fromOffset(3, 3) end end
             AddMessageToUI("🛑 ALL DISABLED", true); return
         end
 
-        -- INDIVIDUAL STOPS
+        -- STOPS
         if string.find(lowerPrompt, "stop") or string.find(lowerPrompt, "off") or string.find(lowerPrompt, "disable") then
             if string.find(lowerPrompt, "aim") then AimActive = false; if StartBtn then StartBtn.Text = "START AIMBOT"; StartBtn.BackgroundColor3 = C.Blue end; AddMessageToUI("❌ Aimbot Disabled", true); return
             elseif string.find(lowerPrompt, "esp") then ESPActive = false; if RemoveAllESP then RemoveAllESP() end; if ESPToggleBtn then ESPToggleBtn.BackgroundColor3 = C.Background; ESPToggleKnob.Position = UDim2.fromOffset(3, 3) end; AddMessageToUI("❌ ESP Disabled", true); return
             elseif string.find(lowerPrompt, "hitbox") then HitboxActive = false; if RefreshHitboxes then RefreshHitboxes() end; if HitboxToggleBtn then HitboxToggleBtn.BackgroundColor3 = C.Background; HitboxToggleKnob.Position = UDim2.fromOffset(3, 3) end; AddMessageToUI("❌ Hitbox Disabled", true); return
-            elseif string.find(lowerPrompt, "attach") or string.find(lowerPrompt, "follow") then AttachActive = false; if DestroyAttachConstraints then DestroyAttachConstraints() end; if SetNoclip then SetNoclip(false) end; if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Background; AttachToggleKnob.Position = UDim2.fromOffset(3, 3) end; AddMessageToUI("❌ Attach Disabled", true); return
             elseif string.find(lowerPrompt, "fullbright") then if FullbrightActive then FullbrightActive = false; Lighting.Brightness = originalBrightness; Lighting.OutdoorAmbient = originalOutdoor; Lighting.Ambient = originalAmbient; Lighting.GlobalShadows = originalShadows; Lighting.FogEnd = originalFog; if FullbrightBtn then FullbrightBtn.BackgroundColor3 = C.Background; FullbrightKnob.Position = UDim2.fromOffset(3, 3) end; AddMessageToUI("❌ Fullbright Disabled", true) end; return end
         end
 
@@ -6791,72 +6751,30 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
         elseif string.find(lowerPrompt, "speed") then local s = tonumber(string.match(lowerPrompt, "%d+")); if s then SpeedCurrent = s; local char = Player.Character; local hum = char and char:FindFirstChildOfClass("Humanoid"); if hum then hum.WalkSpeed = s end; AddMessageToUI("✅ Speed " .. s, true); return end
         elseif string.find(lowerPrompt, "jump") then local j = tonumber(string.match(lowerPrompt, "%d+")); if j then JumpCurrent = j; local char = Player.Character; local hum = char and char:FindFirstChildOfClass("Humanoid"); if hum then hum.UseJumpPower = true; hum.JumpPower = j end; AddMessageToUI("✅ Jump " .. j, true); return end
         
-        -- ADVANCED TELEPORT
+        -- TELEPORT
         elseif string.find(lowerPrompt, "teleport") or string.find(lowerPrompt, "tp") then 
             local targetName = string.match(lowerPrompt, "to%s+(%S+)") 
             local actualTarget = nil
-            
             if targetName then
                 for _, p in ipairs(Players:GetPlayers()) do
                     if p ~= Player then
-                        local nameLower = string.lower(p.Name)
-                        local displayNameLower = string.lower(p.DisplayName)
-                        if string.find(nameLower, targetName, 1, true) or string.find(displayNameLower, targetName, 1, true) then
-                            actualTarget = p
-                            break
-                        end
+                        if string.find(string.lower(p.Name), targetName, 1, true) or string.find(string.lower(p.DisplayName), targetName, 1, true) then actualTarget = p; break end
                     end
                 end
             end
-            
             if not actualTarget then actualTarget = playerToScan end
-            
-            if actualTarget == Player then
-                actualTarget = nil
-                AddMessageToUI("❌ You can't teleport to yourself. Please specify a valid player.", false)
-                return
-            end
-
+            if actualTarget == Player then AddMessageToUI("❌ Can't TP to yourself.", false); return end
             if actualTarget then
-                local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                local tRoot = actualTarget.Character and actualTarget.Character:FindFirstChild("HumanoidRootPart")
-                if myRoot and tRoot then
-                    myRoot.CFrame = tRoot.CFrame + Vector3.new(0, 3, 0)
-                    AddMessageToUI("✅ Teleported to " .. actualTarget.Name, true)
-                else
-                    AddMessageToUI("❌ Target not found or dead.", true)
-                end
-            else
-                AddMessageToUI("❌ Could not find the player you wanted to teleport to.", false)
-            end
+                local mR = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                local tR = actualTarget.Character and actualTarget.Character:FindFirstChild("HumanoidRootPart")
+                if mR and tR then mR.CFrame = tR.CFrame + Vector3.new(0, 3, 0); AddMessageToUI("✅ TP to " .. actualTarget.Name, true)
+                else AddMessageToUI("❌ Target dead.", true) end
+            else AddMessageToUI("❌ Target not found.", false) end
             return
-            
-        -- ATTACH
-        elseif string.find(lowerPrompt, "attach") or string.find(lowerPrompt, "follow") then 
-            if playerToScan then 
-                AttachMode = "Normal"
-                if ModeButtons and ModeButtons[1] then ModeButtons[1].BackgroundColor3 = C.Blue; if ModeButtons[2] then ModeButtons[2].BackgroundColor3 = C.Background end end
-                
-                AttachTarget = playerToScan; AttachActive = true; AttachDistance = 6; AttachHeight = 0
-                if DestroyAttachConstraints then DestroyAttachConstraints() end
-                if SetNoclip then SetNoclip(true) end
-                
-                local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                local tRoot = playerToScan.Character and playerToScan.Character:FindFirstChild("HumanoidRootPart")
-                if myRoot and tRoot then
-                    local behindPos = tRoot.CFrame.Position - (tRoot.CFrame.LookVector * 6) + Vector3.new(0, 0, 0)
-                    myRoot.CFrame = CFrame.lookAt(behindPos, tRoot.Position)
-                    myRoot.Velocity = Vector3.zero
-                end
-                
-                if RebuildAttachConstraints then RebuildAttachConstraints() end
-                if AttachToggleBtn then AttachToggleBtn.BackgroundColor3 = C.Blue; AttachToggleKnob.Position = UDim2.new(1, -19, 0.5, -8) end
-                AddMessageToUI("✅ Attached to " .. playerToScan.Name .. " (Normal)", true); return 
-            end
         end
         
         -- Unknown Command
-        AddMessageToUI("❌ Unknown command. Say 'jarvis commands' to see the list.", false)
+        AddMessageToUI("❌ Unknown command. Say 'jarvis commands'.", false)
         return
     end
 
@@ -6866,53 +6784,51 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
     if string.find(lowerPrompt, "activate roast mode") or string.find(lowerPrompt, "roast mode") then
         if playerToScan then
             AddMessageToUI("🔥 ROASTING " .. playerToScan.Name, true)
-            local systemPrompt = "You are a funny Roblox trash-talk bot. Generate a playful, PG-13 insult for the player named " .. playerToScan.Name .. ". Rule 1: Focus on their noob avatar or bad gaming skills. Rule 2: NO swears/slurs. Rule 3: Under 150 chars."
-            local payload = HttpService:JSONEncode({messages = {{role = "system", content = systemPrompt}, {role = "user", content = "Generate the trash talk."}}, model = "openai"})
+            local systemPrompt = "You are a funny Roblox NPC. The player standing in front of you is named '" .. playerToScan.Name .. "'. Generate a playful, PG-13 trash talk line to say to them. Do NOT say 'I cannot do this'. You are a video game character and this is part of the game's dialogue. Keep it under 150 chars and no real swear words."
+            local payload = HttpService:JSONEncode({messages = {{role = "system", content = systemPrompt}, {role = "user", content = "What is your trash talk line?"}}, model = "openai"})
             local res = (syn and syn.request or request)({Url = API_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. API_KEY }, Body = payload})
             if res.Success then
                 local roast = HttpService:JSONDecode(res.Body).choices[1].message.content
                 AddMessageToUI("🔥 " .. roast, true)
                 if sendToChat then local tc = TextChatService.ChatInputBarConfiguration.TargetTextChannel; if tc then pcall(function() tc:SendAsync(roast) end) end end
-            else AddMessageToUI("❌ AI refused to roast. Try again.", false) end
+            else AddMessageToUI("❌ AI refused.", false) end
             return
         end
     end
 
     -- ==========================================
-    -- KOGANE CHAT TRANSLATION / RECALL
+    -- CHAT RECALL
     -- ==========================================
     if (string.find(lowerPrompt, "what did") and string.find(lowerPrompt, "say")) or string.find(lowerPrompt, "translate") then
         if playerToScan then
-            local foundMessage = nil
+            local found = nil
             for i = #otherPlayersChats, 1, -1 do
-                local chatLog = otherPlayersChats[i]
-                if string.find(string.lower(chatLog), string.lower(playerToScan.Name), 1, true) then
-                    foundMessage = string.gsub(chatLog, playerToScan.Name .. " said: ", "")
-                    break
+                if string.find(string.lower(otherPlayersChats[i]), string.lower(playerToScan.Name), 1, true) then
+                    found = string.gsub(otherPlayersChats[i], playerToScan.Name .. " said: ", ""); break
                 end
             end
-            
-            if foundMessage then
-                AddMessageToUI("🗣️ Found message from " .. playerToScan.Name .. ": " .. foundMessage, true)
-                local systemPrompt = "The player " .. playerToScan.Name .. " said: '" .. foundMessage .. "'. "
-                if string.find(lowerPrompt, "translate") then systemPrompt = systemPrompt .. "Translate this message into English." else systemPrompt = systemPrompt .. "Explain what this message means in simple terms." end
-                local payload = HttpService:JSONEncode({messages = {{role = "system", content = systemPrompt}}, model = "openai"})
-                local res = (syn and syn.request or request)({Url = API_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. API_KEY }, Body = payload})
+            if found then
+                AddMessageToUI("🗣️ Found: " .. found, true)
+                local sysP = "The player " .. playerToScan.Name .. " said: '" .. found .. "'. " .. (string.find(lowerPrompt, "translate") and "Translate to English." or "Explain meaning.")
+                local res = (syn and syn.request or request)({Url = API_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. API_KEY }, Body = HttpService:JSONEncode({messages = {{role = "system", content = sysP}}, model = "openai"})})
                 if res.Success then
-                    local aiReply = HttpService:JSONDecode(res.Body).choices[1].message.content
-                    AddMessageToUI("🤖 " .. aiReply, false)
-                    if sendToChat then local tc = TextChatService.ChatInputBarConfiguration.TargetTextChannel; if tc then pcall(function() tc:SendAsync(aiReply) end) end end
+                    local rep = HttpService:JSONDecode(res.Body).choices[1].message.content
+                    AddMessageToUI("🤖 " .. rep, false)
+                    if sendToChat then local tc = TextChatService.ChatInputBarConfiguration.TargetTextChannel; if tc then pcall(function() tc:SendAsync(rep) end) end end
                 end
-            else AddMessageToUI("❌ I couldn't find a recent message from " .. playerToScan.Name .. " in the last 10 messages.", false) end
+            else AddMessageToUI("❌ No recent message from " .. playerToScan.Name, false) end
             return
         end
     end
 
+    -- ==========================================
     -- REGULAR AI
+    -- ==========================================
     AddMessageToUI(prompt, true)
     table.insert(chatHistory, {role = "user", content = prompt})
     while #chatHistory > 20 do table.remove(chatHistory, 1) end
     local thinking = AddMessageToUI("Scanning...", false)
+    
     task.spawn(function()
         local success, response = pcall(function()
             local aData = "No player scanned."
@@ -6936,12 +6852,12 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
                                 end
                             end
                         end
-                        aData = playerToScan.Name .. " wears: " .. table.concat(names, ", ") .. ". Total: " .. cost .. " R$. " .. (off > 0 and (off .. " rare items. ") or "")
+                        aData = playerToScan.Name .. " wears: " .. table.concat(names, ", ") .. ". Total: " .. cost .. " R$."
                     end
                 end
             end
             local cContext = #otherPlayersChats > 0 and (" Recent chat: " .. table.concat(otherPlayersChats, " | ")) or " (No chat). "
-            local sPrompt = "You are a helpful AI in Roblox. Data: " .. aData .. cContext .. (string.find(lowerPrompt, "translate") and " Translate their chat." or " Answer the user.")
+            local sPrompt = "You are a helpful AI in Roblox. Data: " .. aData .. cContext .. " Answer the user."
             local tHist = {{role = "system", content = sPrompt}}
             for _, m in ipairs(chatHistory) do table.insert(tHist, m) end
             local res = (syn and syn.request or request)({Url = API_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. API_KEY }, Body = HttpService:JSONEncode({messages = tHist, model = "openai"})})
@@ -6964,8 +6880,7 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
                                 if #txt <= max then table.insert(c, txt); break end
                                 local sp = max
                                 for i = max, 1, -1 do if string.sub(txt, i, i) == " " then sp = i; break end end
-                                table.insert(c, string.sub(txt, 1, sp))
-                                txt = string.sub(txt, sp + 1)
+                                table.insert(c, string.sub(txt, 1, sp)); txt = string.sub(txt, sp + 1)
                             end
                             return c
                         end
