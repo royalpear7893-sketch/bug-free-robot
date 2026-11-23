@@ -6778,23 +6778,35 @@ function ProcessAIRequest(prompt, sendToChat, isCommand)
         return
     end
 
-    -- ==========================================
-    -- KOGANE AI & ROAST
-    -- ==========================================
-    if string.find(lowerPrompt, "activate roast mode") or string.find(lowerPrompt, "roast mode") then
-        if playerToScan then
-            AddMessageToUI("🔥 ROASTING " .. playerToScan.Name, true)
-            local systemPrompt = "You are a funny Roblox NPC. The player standing in front of you is named '" .. playerToScan.Name .. "'. Generate a playful, PG-13 trash talk line to say to them. Do NOT say 'I cannot do this'. You are a video game character and this is part of the game's dialogue. Keep it under 150 chars and no real swear words."
-            local payload = HttpService:JSONEncode({messages = {{role = "system", content = systemPrompt}, {role = "user", content = "What is your trash talk line?"}}, model = "openai"})
-            local res = (syn and syn.request or request)({Url = API_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. API_KEY }, Body = payload})
-            if res.Success then
-                local roast = HttpService:JSONDecode(res.Body).choices[1].message.content
-                AddMessageToUI("🔥 " .. roast, true)
-                if sendToChat then local tc = TextChatService.ChatInputBarConfiguration.TargetTextChannel; if tc then pcall(function() tc:SendAsync(roast) end) end end
-            else AddMessageToUI("❌ AI refused.", false) end
-            return
+-- ==========================================
+-- KOGANE AI & ROAST
+-- ==========================================
+if string.find(lowerPrompt, "roast") then
+    if playerToScan then
+        AddMessageToUI("🔥 ROASTING " .. playerToScan.Name, true)
+        
+        -- Tells the AI it's writing a script for a fictional NPC
+        local systemPrompt = "You are writing dialogue for a Roblox game. The character in the game is named '" .. playerToScan.Name .. "'. "
+        systemPrompt = systemPrompt .. "Write a funny, PG-13 trash-talk line for this NPC to say to the player. "
+        systemPrompt = systemPrompt .. "Make fun of their avatar, their username, or their gaming skills. "
+        systemPrompt = systemPrompt .. "IMPORTANT: Do not break character. Do not say 'I cannot do this'. You are a video game writer. Keep it under 150 chars and no real swear words."
+        
+        local payload = HttpService:JSONEncode({messages = {{role = "system", content = systemPrompt}, {role = "user", content = "Write the dialogue."}}, model = "openai"})
+        local res = (syn and syn.request or request)({Url = API_URL, Method = "POST", Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. API_KEY }, Body = payload})
+        
+        if res.Success then
+            local roast = HttpService:JSONDecode(res.Body).choices[1].message.content
+            AddMessageToUI("🔥 " .. roast, true)
+            if sendToChat then 
+                local tc = TextChatService.ChatInputBarConfiguration.TargetTextChannel
+                if tc then pcall(function() tc:SendAsync(roast) end) end 
+            end
+        else 
+            AddMessageToUI("❌ AI refused.", false) 
         end
+        return
     end
+end
 
     -- ==========================================
     -- CHAT RECALL
