@@ -6832,3 +6832,94 @@ TextChatService.MessageReceived:Connect(function(msg)
 end)
 
 print("PERFECT AI CHAT READY")
+--========================================================
+-- GHOST BLOCK PLACER (INTEGRATED)
+--========================================================
+
+local PhysicsService = game:GetService("PhysicsService")
+pcall(function() PhysicsService:RegisterCollisionGroup("GhostGroup") end)
+PhysicsService:CollisionGroupSetCollidable("GhostGroup", "Default", false)
+PhysicsService:CollisionGroupSetCollidable("GhostGroup", "GhostGroup", true)
+
+local function ApplyCollision(char)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then part.CollisionGroup = "GhostGroup" end
+    end
+end
+if Player.Character then ApplyCollision(Player.Character) end
+Player.CharacterAdded:Connect(ApplyCollision)
+
+local GhostGui = Instance.new("ScreenGui")
+GhostGui.Name = "GhostBlockUI"
+GhostGui.ResetOnSpawn = false
+GhostGui.Parent = PlayerGui
+
+local GhostBtn = Instance.new("TextButton")
+GhostBtn.Size = UDim2.new(0, 120, 0, 40)
+GhostBtn.Position = UDim2.new(0, 15, 0, 80) -- Top left, below Roblox menu
+GhostBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+GhostBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+GhostBtn.Text = "PLACE: OFF"
+GhostBtn.Font = Enum.Font.GothamBold
+GhostBtn.TextSize = 14
+GhostBtn.BorderSizePixel = 0
+GhostBtn.Parent = GhostGui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 8)
+Corner.Parent = GhostBtn
+
+local Stroke = Instance.new("UIStroke")
+Stroke.Color = Color3.fromRGB(0, 255, 255)
+Stroke.Thickness = 2
+Stroke.Parent = GhostBtn
+
+local PlacementActive = false
+local CurrentBlock = nil
+
+GhostBtn.MouseButton1Click:Connect(function()
+    PlacementActive = not PlacementActive
+    if PlacementActive then
+        GhostBtn.Text = "PLACE: ON"
+        GhostBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+        GhostBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    else
+        GhostBtn.Text = "PLACE: OFF"
+        GhostBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        GhostBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        if CurrentBlock then CurrentBlock:Destroy(); CurrentBlock = nil end
+    end
+end)
+
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or not PlacementActive then return end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if CurrentBlock then CurrentBlock:Destroy() end
+
+        local block = Instance.new("Part")
+        block.Name = "GhostBlock"
+        block.Size = Vector3.new(6, 1, 6)
+        block.Anchored = true
+        block.CanCollide = true
+        block.Color = Color3.fromRGB(0, 255, 255)
+        block.Material = Enum.Material.Neon
+        block.Transparency = 0.5
+        block.CollisionGroup = "GhostGroup"
+        
+        local targetPos
+        -- Use a raycast from camera so it works in the sky
+        local ray = Ray.new(Camera.CFrame.Position, Camera.CFrame.LookVector * 500)
+        local hitPart, hitPos = workspace:FindPartOnRay(ray, Player.Character)
+        
+        if hitPart then
+            targetPos = hitPos + Vector3.new(0, 1, 0)
+        else
+            targetPos = Camera.CFrame.Position + (Camera.CFrame.LookVector * 30)
+        end
+        
+        block.CFrame = CFrame.new(targetPos)
+        block.Parent = workspace
+        CurrentBlock = block
+    end
+end)
